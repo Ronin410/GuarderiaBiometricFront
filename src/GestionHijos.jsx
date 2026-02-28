@@ -104,17 +104,27 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     }
   };
 
-  const manejarDesvincular = async (hijo) => {
-    const confirmar = window.confirm(`¿Quieres quitar a ${hijo.nombre_niño} de la lista de ${nombreTutorEdit}?`);
-    if (!confirmar) return;
-    try {
-      await axios.delete(`${API_URL}/desvincular-hijo/${padreId}/${hijo.id}`);
-      cargarHijosActuales();
-    } catch (err) {
-      alert("Error al desvincular");
-    }
-  };
+const manejarDesvincular = async (hijo) => {
+  const confirmar = window.confirm(`¿Quieres quitar a ${hijo.nombre_niño} de la lista de ${nombreTutorEdit}?`);
+  if (!confirmar) return;
 
+  setLoading(true); // Opcional: mostrar carga
+  try {
+    // CAMBIO: Usar POST y enviar el objeto JSON que espera tu struct de Go
+    await axios.post(`${API_URL}/desvincular-hijo`, {
+      padre_id: parseInt(padreId),
+      hijo_id: parseInt(hijo.id)
+    });
+
+    alert("✅ Desvinculación exitosa");
+    cargarHijosActuales();
+  } catch (err) {
+    console.error(err);
+    alert("❌ Error al desvincular: " + (err.response?.data?.mensaje || "Error desconocido"));
+  } finally {
+    setLoading(false);
+  }
+};
   const manejarAltaHijo = async (hijo) => {
     if (!window.confirm(`¿Activar a ${hijo.nombre_niño}?`)) return;
     try {
