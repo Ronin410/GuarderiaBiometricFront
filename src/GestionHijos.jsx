@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { UserPlus, Search, Baby, Trash2, Save, X, Edit3, Loader2, Check } from 'lucide-react';
 
-const API_URL = 'https://guarderiabiometricback.onrender.com';
+//const API_URL = 'https://guarderiabiometricback.onrender.com';
+const API_URL = 'http://localhost:8099';
 
 const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   const [hijosRelacionados, setHijosRelacionados] = useState([]);

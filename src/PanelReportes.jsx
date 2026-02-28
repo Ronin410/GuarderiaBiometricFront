@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Download, UserCheck, FileText, RefreshCw, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
 
-const API_URL = 'https://guarderiabiometricback.onrender.com';
+//const API_URL = 'https://guarderiabiometricback.onrender.com';
+const API_URL = 'http://localhost:8099';
 
 const PanelReportes = () => {
   const [reportes, setReportes] = useState([]);
