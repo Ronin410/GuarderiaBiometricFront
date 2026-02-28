@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw } from 'lucide-react';
 
-//const API_URL = 'https://guarderiabiometricback.onrender.com';
-const API_URL = 'http://localhost:8099';
+const API_URL = 'https://guarderiabiometricback.onrender.com';
+//const API_URL = 'http://localhost:8099';
 
 const VistaBitacora = () => {
   const [niños, setNiños] = useState([]);

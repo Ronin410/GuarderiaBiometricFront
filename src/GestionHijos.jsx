@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { UserPlus, Search, Baby, Trash2, Save, X, Edit3, Loader2, Check } from 'lucide-react';
+import { 
+  UserPlus, Search, Baby, Save, X, Edit3, 
+  Loader2, Check, RotateCcw, Eye, EyeOff, UserX, Link2Off
+} from 'lucide-react';
 
-//const API_URL = 'https://guarderiabiometricback.onrender.com';
-const API_URL = 'http://localhost:8099';
+const API_URL = 'https://guarderiabiometricback.onrender.com';
+//const API_URL = 'http://localhost:8099';
 
 const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   const [hijosRelacionados, setHijosRelacionados] = useState([]);
@@ -12,25 +15,34 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   const [nuevoHijoNombre, setNuevoHijoNombre] = useState('');
   const [loading, setLoading] = useState(false);
   
+  const [verBajas, setVerBajas] = useState(false);
+  
+  // Estados para edición de Tutor
   const [nombreTutorEdit, setNombreTutorEdit] = useState(nombrePadre);
   const [editandoTutor, setEditandoTutor] = useState(false);
 
+  // NUEVOS Estados para edición de Hijo
+  const [editandoHijoId, setEditandoHijoId] = useState(null);
+  const [nombreHijoEdit, setNombreHijoEdit] = useState('');
+
+  const cargarHijosActuales = async () => {
+    if (!padreId) return;
+    try {
+      const res = await axios.get(`${API_URL}/padre/${padreId}/hijos`);
+      const hijosMapeados = res.data.map(h => ({ 
+        id: h.id, 
+        nombre_niño: h.nombre || h.nombre_niño, 
+        activo: h.activo !== undefined ? h.activo : true,
+        esNuevo: false, 
+        persistente: true 
+      }));
+      setHijosRelacionados(hijosMapeados);
+    } catch (err) {
+      console.error("Error cargando hijos:", err);
+    }
+  };
+
   useEffect(() => {
-    const cargarHijosActuales = async () => {
-      if (!padreId) return;
-      try {
-        const res = await axios.get(`${API_URL}/padre/${padreId}/hijos`);
-        const hijosMapeados = res.data.map(h => ({ 
-          id: h.id, 
-          nombre_niño: h.nombre || h.nombre_niño || h.Nombre, 
-          esNuevo: false, 
-          persistente: true 
-        }));
-        setHijosRelacionados(hijosMapeados);
-      } catch (err) {
-        console.error("Error cargando hijos:", err);
-      }
-    };
     cargarHijosActuales();
   }, [padreId]);
 
@@ -50,6 +62,8 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     return () => clearTimeout(delayDebounceFn);
   }, [busqueda]);
 
+  // --- LÓGICA DE ACTUALIZACIÓN ---
+
   const manejarActualizarTutor = async () => {
     if (!nombreTutorEdit.trim()) return;
     setLoading(true);
@@ -59,23 +73,64 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
         nombre: nombreTutorEdit.trim()
       });
       setEditandoTutor(false);
-      alert("✅ Nombre del tutor actualizado");
     } catch (err) {
       alert("❌ Error al actualizar tutor");
-      setNombreTutorEdit(nombrePadre);
     } finally {
       setLoading(false);
     }
   };
 
-  const agregarSugerencia = (hijo) => {
-    const nombreSeleccionado = hijo.nombre || hijo.nombre_niño || hijo.Nombre;
-    const idSeleccionado = hijo.id || hijo.ID;
+  const manejarActualizarNombreHijo = async (id) => {
+    if (!nombreHijoEdit.trim()) return;
+    try {
+      await axios.put(`${API_URL}/hijos/${id}`, {
+        nombre: nombreHijoEdit.trim()
+      });
+      setEditandoHijoId(null);
+      cargarHijosActuales();
+    } catch (err) {
+      alert("❌ Error al actualizar el nombre del niño");
+    }
+  };
 
-    if (!hijosRelacionados.find(h => h.id === idSeleccionado)) {
+  const manejarBajaHijo = async (hijo) => {
+    const confirmar = window.confirm(`¿Seguro que quieres DESACTIVAR a ${hijo.nombre_niño}?`);
+    if (!confirmar) return;
+    try {
+      await axios.patch(`${API_URL}/hijos/${hijo.id}/desactivar`);
+      cargarHijosActuales();
+    } catch (err) {
+      alert("Error al procesar la baja");
+    }
+  };
+
+  const manejarDesvincular = async (hijo) => {
+    const confirmar = window.confirm(`¿Quieres quitar a ${hijo.nombre_niño} de la lista de ${nombreTutorEdit}?`);
+    if (!confirmar) return;
+    try {
+      await axios.delete(`${API_URL}/desvincular-hijo/${padreId}/${hijo.id}`);
+      cargarHijosActuales();
+    } catch (err) {
+      alert("Error al desvincular");
+    }
+  };
+
+  const manejarAltaHijo = async (hijo) => {
+    if (!window.confirm(`¿Activar a ${hijo.nombre_niño}?`)) return;
+    try {
+      await axios.patch(`${API_URL}/hijos/${hijo.id}/activar`);
+      cargarHijosActuales();
+    } catch (err) {
+      alert("Error al reactivar");
+    }
+  };
+
+  const agregarSugerencia = (hijo) => {
+    if (!hijosRelacionados.find(h => h.id === hijo.id)) {
       setHijosRelacionados([...hijosRelacionados, { 
-        id: idSeleccionado,
-        nombre_niño: nombreSeleccionado,
+        id: hijo.id,
+        nombre_niño: hijo.nombre_niño,
+        activo: true,
         esNuevo: false, 
         persistente: false 
       }]);
@@ -88,28 +143,12 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     if (nuevoHijoNombre.trim()) {
       setHijosRelacionados([...hijosRelacionados, { 
         nombre_niño: nuevoHijoNombre.trim(), 
+        activo: true,
         esNuevo: true,
         persistente: false,
         id: Date.now() 
       }]);
       setNuevoHijoNombre('');
-    }
-  };
-
-  const manejarEliminacion = async (hijo) => {
-    if (hijo.persistente) {
-      if (!window.confirm(`¿Desvincular a ${hijo.nombre_niño}?`)) return;
-      try {
-        await axios.post(`${API_URL}/desvincular-hijo`, {
-          padre_id: parseInt(padreId),
-          hijo_id: hijo.id
-        });
-        setHijosRelacionados(prev => prev.filter(h => h.id !== hijo.id));
-      } catch (err) {
-        alert("Error al desvincular");
-      }
-    } else {
-      setHijosRelacionados(prev => prev.filter(item => item.id !== hijo.id));
     }
   };
 
@@ -130,19 +169,19 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
           hijo_id: idHijoFinal 
         });
       }
-      alert("✅ Cambios guardados con éxito");
-      onFinalizar();
+      alert("✅ Cambios guardados");
+      cargarHijosActuales();
     } catch (error) {
-      alert("❌ Error al guardar relaciones");
+      alert("❌ Error al guardar");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-8 bg-white text-slate-900 max-h-[90vh] overflow-y-auto rounded-[2.5rem]">
-      {/* SECCIÓN TUTOR EDITABLE */}
-      <div className="flex justify-between items-start mb-10 border-b border-slate-100 pb-8">
+    <div className="p-8 bg-white text-slate-900 max-h-[90vh] overflow-y-auto rounded-[2.5rem] relative">
+      {/* CABECERA TUTOR */}
+      <div className="flex justify-between items-start mb-10 border-b border-slate-100 pb-8 pr-12">
         <div className="flex-1">
           <p className="text-violet-600 font-black uppercase text-[10px] tracking-[0.2em] mb-2">Tutor Registrado</p>
           {editandoTutor ? (
@@ -159,16 +198,12 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
           ) : (
             <div className="flex items-center gap-5 group">
               <h2 className="text-4xl font-black uppercase tracking-tighter text-slate-900 leading-none">{nombreTutorEdit}</h2>
-              <button 
-                onClick={() => setEditandoTutor(true)}
-                className="p-2.5 bg-violet-50 rounded-xl text-violet-600 hover:bg-violet-100 transition-all opacity-0 group-hover:opacity-100"
-              >
+              <button onClick={() => setEditandoTutor(true)} className="p-2.5 bg-violet-50 rounded-xl text-violet-600 hover:bg-violet-100 transition-all opacity-0 group-hover:opacity-100">
                 <Edit3 size={20} />
               </button>
             </div>
           )}
         </div>
-        <button onClick={onFinalizar} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"><X size={32}/></button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-12">
@@ -186,16 +221,10 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
                 className="w-full bg-white border border-slate-200 rounded-[1.5rem] py-5 pl-14 pr-6 outline-none focus:ring-2 focus:ring-violet-500 transition-all text-slate-900 font-medium shadow-sm"
               />
               {sugerencias.length > 0 && (
-                <div className="absolute z-50 w-full mt-3 bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-2">
+                <div className="absolute z-50 w-full mt-3 bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-2xl">
                   {sugerencias.map(s => (
-                    <button 
-                      key={s.id || s.ID} 
-                      onClick={() => agregarSugerencia(s)}
-                      className="w-full p-5 text-left hover:bg-violet-50 flex justify-between items-center border-b border-slate-50 last:border-0 group transition-colors"
-                    >
-                      <span className="font-bold uppercase text-slate-700 group-hover:text-violet-700">
-                        {s.nombre || s.nombre_niño || s.Nombre}
-                      </span>
+                    <button key={s.id} onClick={() => agregarSugerencia(s)} className="w-full p-5 text-left hover:bg-violet-50 flex justify-between items-center border-b border-slate-50 last:border-0 group transition-colors">
+                      <span className="font-bold uppercase text-slate-700 group-hover:text-violet-700">{s.nombre_niño}</span>
                       <UserPlus size={20} className="text-violet-400 group-hover:text-violet-600"/>
                     </button>
                   ))}
@@ -220,41 +249,95 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
           </div>
         </div>
 
-        {/* LISTA DE HIJOS VINCULADOS */}
+        {/* LISTA DE HIJOS */}
         <div className="bg-white p-7 rounded-[3rem] border-2 border-slate-50 shadow-inner">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase mb-8 tracking-[0.2em] px-2">Niños vinculados actualmente</h3>
+          <div className="flex justify-between items-center mb-8 px-2">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Familia vinculada</h3>
+            <button 
+              onClick={() => setVerBajas(!verBajas)}
+              className="flex items-center gap-2 text-[9px] font-black uppercase bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-all text-slate-600"
+            >
+              {verBajas ? <EyeOff size={12}/> : <Eye size={12}/>}
+              {verBajas ? "Ocultar Bajas" : "Ver Bajas"}
+            </button>
+          </div>
+
           <div className="space-y-4">
-            {hijosRelacionados.map((h) => (
-              <div key={h.id} className="flex items-center justify-between bg-slate-50/50 p-5 rounded-[1.5rem] border border-slate-100 hover:border-violet-200 hover:bg-violet-50/30 transition-all group">
-                <div className="flex items-center gap-5">
-                  <div className={`p-4 rounded-2xl shadow-sm ${h.persistente ? 'bg-violet-100 text-violet-600' : 'bg-amber-100 text-amber-600 animate-pulse'}`}>
+            {hijosRelacionados
+              .filter(h => verBajas ? true : h.activo !== false)
+              .map((h) => (
+              <div key={h.id} className={`flex items-center justify-between p-5 rounded-[1.5rem] border transition-all ${!h.activo ? 'bg-slate-100 opacity-60 grayscale border-dashed border-slate-300' : 'bg-slate-50 border-slate-100'}`}>
+                <div className="flex items-center gap-5 flex-1">
+                  <div className={`p-4 rounded-2xl shadow-sm ${!h.activo ? 'bg-slate-200 text-slate-400' : h.persistente ? 'bg-violet-100 text-violet-600' : 'bg-amber-100 text-amber-600 animate-pulse'}`}>
                     <Baby size={24}/>
                   </div>
-                  <div>
-                    <p className="font-black text-lg uppercase tracking-tight text-slate-800 leading-tight">{h.nombre_niño}</p>
-                    <p className={`text-[10px] font-black uppercase mt-1 tracking-widest ${h.persistente ? 'text-slate-400' : 'text-amber-500'}`}>
-                      {h.persistente ? 'Confirmado' : 'Pendiente de guardar'}
-                    </p>
+                  
+                  <div className="flex-1">
+                    {editandoHijoId === h.id ? (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          autoFocus
+                          value={nombreHijoEdit}
+                          onChange={(e) => setNombreHijoEdit(e.target.value)}
+                          className="bg-white border-2 border-violet-400 rounded-lg px-3 py-1 text-sm font-bold uppercase outline-none w-full"
+                        />
+                        <button onClick={() => manejarActualizarNombreHijo(h.id)} className="text-emerald-600"><Check size={18}/></button>
+                        <button onClick={() => setEditandoHijoId(null)} className="text-slate-400"><X size={18}/></button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group/name">
+                        <p className={`font-black text-lg uppercase tracking-tight leading-tight ${!h.activo ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                          {h.nombre_niño}
+                        </p>
+                        {h.activo && h.persistente && (
+                          <button 
+                            onClick={() => { setEditandoHijoId(h.id); setNombreHijoEdit(h.nombre_niño); }}
+                            className="opacity-0 group-hover/name:opacity-100 text-violet-400 transition-opacity"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 mt-1">
+                       {!h.activo ? (
+                         <span className="text-[9px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-black uppercase">Desactivado</span>
+                       ) : (
+                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${h.persistente ? 'bg-violet-100 text-violet-600' : 'bg-amber-100 text-amber-600'}`}>
+                           {h.persistente ? 'Activo' : 'Por Guardar'}
+                         </span>
+                       )}
+                    </div>
                   </div>
                 </div>
-                <button onClick={() => manejarEliminacion(h)} className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2.5 rounded-xl transition-all"><Trash2 size={22}/></button>
+                
+                <div className="flex gap-1 ml-4">
+                  {h.persistente && (
+                    h.activo ? (
+                      <>
+                        <button onClick={() => manejarBajaHijo(h)} title="Baja del sistema" className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-2.5 rounded-xl transition-all"><UserX size={20}/></button>
+                        <button onClick={() => manejarDesvincular(h)} title="Desvincular tutor" className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 p-2.5 rounded-xl transition-all"><Link2Off size={20}/></button>
+                      </>
+                    ) : (
+                      <button onClick={() => manejarAltaHijo(h)} title="Reactivar Alumno" className="text-emerald-500 hover:bg-emerald-50 p-2.5 rounded-xl transition-all"><RotateCcw size={22}/></button>
+                    )
+                  )}
+                  {!h.persistente && (
+                     <button onClick={() => setHijosRelacionados(prev => prev.filter(item => item.id !== h.id))} className="text-rose-400 p-2.5"><X size={22}/></button>
+                  )}
+                </div>
               </div>
             ))}
-            {hijosRelacionados.length === 0 && (
-              <div className="text-center py-12 flex flex-col items-center opacity-30">
-                <Baby size={48} className="mb-3 text-slate-400" />
-                <p className="font-bold uppercase text-[10px] tracking-widest">No hay niños vinculados</p>
-              </div>
-            )}
           </div>
 
           <button 
             onClick={guardarRelaciones} 
             disabled={loading || hijosRelacionados.every(h => h.persistente)}
-            className="w-full mt-10 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-100 disabled:text-slate-300 py-6 rounded-[1.5rem] font-black uppercase text-white shadow-xl shadow-violet-600/20 flex items-center justify-center gap-4 transition-all active:scale-95"
+            className="w-full mt-10 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-100 disabled:text-slate-300 py-6 rounded-[1.5rem] font-black uppercase text-white shadow-xl flex items-center justify-center gap-4 transition-all"
           >
             {loading ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>}
-            {loading ? 'Guardando...' : 'Guardar Cambios de Familia'}
+            {loading ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
       </div>

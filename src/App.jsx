@@ -19,7 +19,8 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-const API_URL = 'http://localhost:8099';
+const API_URL = 'https://guarderiabiometricback.onrender.com';
+//const API_URL = 'http://localhost:8099';
 
 // Configuración para cámara VERTICAL (Portrait)
 const videoConstraints = {
@@ -118,9 +119,18 @@ function App() {
   };
 
   const procesarRostro = async (endpoint) => {
-    if (!webcamRef.current) return;
-    const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) return;
+if (endpoint === 'registrar' && !nombre.trim()) {
+    alert("⚠️ Error: No has escrito un nombre para el registro.");
+    return; // Esto detiene la función y no deja que siga al axios
+  }
+
+  // 2. Validar cámara
+  if (!webcamRef.current) return;
+  const imageSrc = webcamRef.current.getScreenshot();
+  if (!imageSrc) {
+    alert("No se pudo capturar la imagen de la cámara.");
+    return;
+  }
     setLoading(true);
     const base64Image = imageSrc.split(',')[1];
     try {
@@ -296,7 +306,7 @@ function App() {
 
                <button 
                  onClick={() => procesarRostro(tab)} 
-                 disabled={loading || (tab === 'registrar' && !nombre)} 
+                 disabled={loading} 
                  className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white rounded-[2rem] font-black uppercase text-xl shadow-lg active:scale-95 transition-all"
                >
                  {loading ? 'Procesando...' : (tab === 'registrar' ? 'Confirmar Registro' : 'Escanear Rostro')}
