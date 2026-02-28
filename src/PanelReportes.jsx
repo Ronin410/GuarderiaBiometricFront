@@ -1,9 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Download, UserCheck, FileText, RefreshCw, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
+// 1. Importamos la configuración personalizada en lugar de axios directamente
+import api from './axiosConfig'; 
+import { Download, UserCheck, RefreshCw, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
 
-const API_URL = 'https://guarderiabiometricback.onrender.com';
-//const API_URL = 'http://localhost:8099';
+// Ya no necesitamos definir API_URL aquí porque está dentro de axiosConfig
+// const API_URL = 'http://localhost:8099';
+
+const stylePrint = `
+  @media print {
+    @page {
+      size: landscape;
+      margin: 1cm;
+    }
+    body {
+      background: white !important;
+      -webkit-print-color-adjust: exact;
+      margin: 0 !important;
+      display: flex;
+      justify-content: center;
+    }
+    .no-print {
+      display: none !important;
+    }
+    .print-container {
+      width: 100% !important;
+      max-width: 1100px;
+      margin: 0 auto !important;
+      padding: 0 !important;
+    }
+    .table-wrapper {
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      width: 100% !important;
+    }
+    table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+      margin: 0 auto !important;
+    }
+    th, td {
+      padding: 10px 6px !important;
+      font-size: 10px !important;
+      border: 1px solid #cbd5e1 !important;
+      text-align: center !important;
+      word-wrap: break-word !important;
+    }
+    .text-left-print {
+      text-align: left !important;
+    }
+  }
+`;
 
 const PanelReportes = () => {
   const [reportes, setReportes] = useState([]);
@@ -13,31 +61,38 @@ const PanelReportes = () => {
 
   const nombreGuarderia = localStorage.getItem('nombre_guarderia') || 'BioSafe Kiosk';
 
-  // Función para convertir "DD/MM/YYYY HH:mm" a un objeto Date real para poder comparar
+  const formatearFechaLocal = (fechaStr) => {
+    if (!fechaStr) return "--:--";
+    try {
+      const [fechaPart, horaPart] = fechaStr.split(' ');
+      const [dia, mes, año] = fechaPart.split('/');
+      const fechaUTC = new Date(`${año}-${mes}-${dia}T${horaPart}:00Z`);
+      return fechaUTC.toLocaleString('es-MX', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+      });
+    } catch (e) { return fechaStr; }
+  };
+
   const parseFechaBackend = (fechaStr) => {
     if (!fechaStr) return new Date(0);
     const [fecha, hora] = fechaStr.split(' ');
     const [dia, mes, año] = fecha.split('/');
-    // Formato ISO: YYYY-MM-DDTHH:mm:00
-    return new Date(`${año}-${mes}-${dia}T${hora}:00`);
+    return new Date(`${año}-${mes}-${dia}T${hora}:00Z`);
   };
 
   const obtenerReportes = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/reportes-asistencia`, {
+      // 2. Usamos 'api' en lugar de 'axios' y solo ponemos el endpoint relativo
+      const res = await api.get('/reportes-asistencia', {
         params: { inicio: fechaInicio, fin: fechaFin }
       });
-      
       let datos = Array.isArray(res.data) ? res.data : [];
-
-      // --- LÓGICA DE ORDENAMIENTO ASCENDENTE ---
-      datos.sort((a, b) => {
-        return parseFechaBackend(a.fecha) - parseFechaBackend(b.fecha);
-      });
-
+      datos.sort((a, b) => parseFechaBackend(a.fecha) - parseFechaBackend(b.fecha));
       setReportes(datos);
     } catch (error) {
+      // Si el error es 401, axiosConfig se encargará de redirigir antes de llegar aquí
       console.error("Error al obtener reportes", error);
     } finally {
       setLoading(false);
@@ -49,121 +104,83 @@ const PanelReportes = () => {
   }, [fechaInicio, fechaFin]);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 -m-4 p-8 animate-in fade-in duration-500">
-      
+    <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 animate-in fade-in duration-500 print-container">
+      <style>{stylePrint}</style>
+
       {/* TÍTULO PARA IMPRESIÓN */}
-      <div className="hidden print:block border-b-4 border-slate-900 pb-6 mb-10">
-        <div className="flex justify-between items-end">
+      <div className="hidden print:block border-b-4 border-slate-900 pb-4 mb-6">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-black uppercase text-slate-900">{nombreGuarderia}</h1>
-            <h2 className="text-xl font-bold uppercase text-violet-600">Reporte Cronológico de Asistencia</h2>
+            <h1 className="text-2xl font-black uppercase text-slate-900">{nombreGuarderia}</h1>
+            <h2 className="text-lg font-bold uppercase text-violet-600">Reporte de Asistencia</h2>
           </div>
-          <div className="text-right">
-            <p className="text-slate-600 font-bold">Periodo: {fechaInicio} al {fechaFin}</p>
-            <p className="text-slate-400 text-[10px] uppercase font-black">Generado: {new Date().toLocaleString()}</p>
+          <div className="text-right text-xs">
+            <p className="font-bold">Periodo: {fechaInicio} al {fechaFin}</p>
+            <p className="text-slate-500">Generado: {new Date().toLocaleString()}</p>
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN DE FILTROS */}
-      <div className="no-print grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/60 mb-8">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2">
-            <CalendarIcon size={12} className="text-violet-500" /> Fecha Inicial
+      {/* FILTROS (no-print) */}
+      <div className="no-print grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-lg mb-8">
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
+            <CalendarIcon size={12} /> Fecha Inicial
           </label>
-          <input 
-            type="date" 
-            value={fechaInicio}
-            onChange={(e) => setFechaInicio(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 transition-all font-bold shadow-inner"
-          />
+          <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
         </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2">
-            <CalendarIcon size={12} className="text-violet-500" /> Fecha Final
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
+            <CalendarIcon size={12} /> Fecha Final
           </label>
-          <input 
-            type="date" 
-            value={fechaFin}
-            onChange={(e) => setFechaFin(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 transition-all font-bold shadow-inner"
-          />
+          <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
         </div>
-        <div className="flex items-end gap-3">
-          <button 
-            onClick={obtenerReportes}
-            className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all shadow-sm active:scale-95"
-          >
-            <RefreshCw size={24} className={loading ? "animate-spin" : ""} />
+        <div className="flex items-end gap-2">
+          <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200">
+            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
           <button 
             onClick={() => window.print()} 
-            disabled={reportes.length === 0}
-            className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-100 disabled:text-slate-300 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-violet-200 active:scale-95"
+            disabled={reportes.length === 0} 
+            className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"
           >
-            <Download size={20} /> IMPRIMIR REPORTE
+            <Download size={18} /> IMPRIMIR
           </button>
         </div>
       </div>
 
-      {/* TABLA DE RESULTADOS */}
-      <div className="bg-white print:bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-2xl shadow-slate-200/50">
+      {/* TABLA PRINCIPAL */}
+      <div className="table-wrapper bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50 print:bg-slate-50 border-b-2 border-slate-100">
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Fecha / Hora</th>
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Alumno</th>
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Responsable</th>
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Movimiento</th>
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Estado</th>
-                <th className="p-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Observaciones</th>
+              <tr className="bg-slate-50 border-b">
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase w-[15%] text-center">Fecha/Hora</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase w-[20%] text-center">Alumno</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase w-[20%] text-center">Responsable</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase text-center w-[10%]">Mov.</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase text-center w-[10%]">Estado</th>
+                <th className="p-4 text-[10px] font-black text-slate-500 uppercase w-[25%] text-center">Observaciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {reportes.map((reg, i) => (
-                <tr key={i} className="hover:bg-violet-50/30 transition-colors group">
-                  <td className="p-6 text-sm font-bold text-slate-500 whitespace-nowrap">
-                    {reg.fecha}
-                  </td>
-                  <td className="p-6">
-                    <span className="text-base font-black text-slate-900 uppercase tracking-tight">
-                      {reg.hijo_nombre}
-                    </span>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-violet-600 flex items-center gap-2">
-                        <UserCheck size={16} className="text-violet-400" /> {reg.tutor_nombre}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-6 text-center">
-                    <span className={`text-[10px] font-black px-4 py-2 rounded-xl border-2 uppercase tracking-widest shadow-sm inline-block w-24 ${
-                      reg.tipo === 'ENTRADA' 
-                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                      : 'bg-orange-50 text-orange-600 border-orange-100'
-                    }`}>
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="p-4 text-xs font-bold text-slate-500 text-center">{formatearFechaLocal(reg.fecha)}</td>
+                  <td className="p-4 text-sm font-black text-slate-900 uppercase text-left-print">{reg.hijo_nombre}</td>
+                  <td className="p-4 text-xs font-bold text-violet-600 text-left-print">{reg.tutor_nombre}</td>
+                  <td className="p-4 text-center">
+                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${reg.tipo === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
                       {reg.tipo}
                     </span>
                   </td>
-                  <td className="p-6">
-                    <div className="flex justify-center gap-2">
-                      <div title="Aseado" className={`p-2 rounded-lg border ${reg.aseado ? 'bg-blue-50 border-blue-200 text-blue-500' : 'bg-rose-50 border-rose-100 text-rose-400'}`}>
-                        <CheckCircle size={18} />
-                      </div>
-                      <div title="Golpe" className={`p-2 rounded-lg border ${reg.reporte_golpe ? 'bg-red-50 border-red-200 text-red-500 animate-pulse shadow-sm shadow-red-100' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
-                        <ShieldAlert size={18} />
-                      </div>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-1">
+                      <CheckCircle size={16} className={reg.aseado ? 'text-blue-500' : 'text-slate-200'} />
+                      <ShieldAlert size={16} className={reg.reporte_golpe ? 'text-red-500 animate-pulse' : 'text-slate-200'} />
                     </div>
                   </td>
-                  <td className="p-6">
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 min-w-[200px]">
-                      <p className="text-xs text-slate-600 italic leading-relaxed">
-                        {reg.observaciones || "Sin observaciones."}
-                      </p>
-                    </div>
-                  </td>
+                  <td className="p-4 text-[10px] italic text-slate-600 text-left-print">{reg.observaciones || "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -171,14 +188,10 @@ const PanelReportes = () => {
         </div>
       </div>
       
-      {/* PIE DE PÁGINA PARA IMPRESIÓN */}
-      <div className="hidden print:flex justify-around items-center mt-20 pt-10 border-t-2 border-slate-200">
-        <div className="text-center w-64 pt-4 border-t-2 border-slate-900">
-          <p className="text-[12px] font-black text-slate-900 uppercase">Firma de Dirección</p>
-        </div>
-        <div className="text-center w-64 pt-4 border-t-2 border-slate-900">
-          <p className="text-[12px] font-black text-slate-900 uppercase">Sello Institucional</p>
-        </div>
+      {/* PIE DE PÁGINA CENTRADO */}
+      <div className="hidden print:flex justify-center gap-20 mt-16 pb-10">
+        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold">FIRMA DE DIRECCIÓN</div>
+        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold">SELLO INSTITUCIONAL</div>
       </div>
     </div>
   );

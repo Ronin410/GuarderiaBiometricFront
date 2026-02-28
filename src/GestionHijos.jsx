@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// Cambiamos axios por la instancia personalizada
+import api from './axiosConfig'; 
 import { 
   UserPlus, Search, Baby, Save, X, Edit3, 
   Loader2, Check, RotateCcw, Eye, EyeOff, UserX, Link2Off
 } from 'lucide-react';
 
-const API_URL = 'https://guarderiabiometricback.onrender.com';
-//const API_URL = 'http://localhost:8099';
+// Ya no necesitamos definir API_URL aquí si baseURL ya está en axiosconfig.js,
+// pero la mantenemos si prefieres usar rutas completas o relativas.
+const API_URL = 'http://localhost:8099';
 
 const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   const [hijosRelacionados, setHijosRelacionados] = useState([]);
@@ -17,18 +19,17 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   
   const [verBajas, setVerBajas] = useState(false);
   
-  // Estados para edición de Tutor
   const [nombreTutorEdit, setNombreTutorEdit] = useState(nombrePadre);
   const [editandoTutor, setEditandoTutor] = useState(false);
 
-  // NUEVOS Estados para edición de Hijo
   const [editandoHijoId, setEditandoHijoId] = useState(null);
   const [nombreHijoEdit, setNombreHijoEdit] = useState('');
 
   const cargarHijosActuales = async () => {
     if (!padreId) return;
     try {
-      const res = await axios.get(`${API_URL}/padre/${padreId}/hijos`);
+      // Usamos 'api' en lugar de 'axios'
+      const res = await api.get(`/padre/${padreId}/hijos`);
       const hijosMapeados = res.data.map(h => ({ 
         id: h.id, 
         nombre_niño: h.nombre || h.nombre_niño, 
@@ -50,7 +51,7 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     const delayDebounceFn = setTimeout(async () => {
       if (busqueda.trim().length > 2) {
         try {
-          const res = await axios.get(`${API_URL}/buscar-hijos?q=${busqueda}`);
+          const res = await api.get(`/buscar-hijos?q=${busqueda}`);
           setSugerencias(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
           setSugerencias([]);
@@ -62,13 +63,11 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     return () => clearTimeout(delayDebounceFn);
   }, [busqueda]);
 
-  // --- LÓGICA DE ACTUALIZACIÓN ---
-
   const manejarActualizarTutor = async () => {
     if (!nombreTutorEdit.trim()) return;
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/actualizar-padre`, {
+      await api.post(`/actualizar-padre`, {
         id: parseInt(padreId),
         nombre: nombreTutorEdit.trim()
       });
@@ -83,7 +82,7 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
   const manejarActualizarNombreHijo = async (id) => {
     if (!nombreHijoEdit.trim()) return;
     try {
-      await axios.put(`${API_URL}/hijos/${id}`, {
+      await api.put(`/hijos/${id}`, {
         nombre: nombreHijoEdit.trim()
       });
       setEditandoHijoId(null);
@@ -97,38 +96,38 @@ const GestionHijos = ({ padreId, nombrePadre, onFinalizar }) => {
     const confirmar = window.confirm(`¿Seguro que quieres DESACTIVAR a ${hijo.nombre_niño}?`);
     if (!confirmar) return;
     try {
-      await axios.patch(`${API_URL}/hijos/${hijo.id}/desactivar`);
+      await api.patch(`/hijos/${hijo.id}/desactivar`);
       cargarHijosActuales();
     } catch (err) {
       alert("Error al procesar la baja");
     }
   };
 
-const manejarDesvincular = async (hijo) => {
-  const confirmar = window.confirm(`¿Quieres quitar a ${hijo.nombre_niño} de la lista de ${nombreTutorEdit}?`);
-  if (!confirmar) return;
+  const manejarDesvincular = async (hijo) => {
+    const confirmar = window.confirm(`¿Quieres quitar a ${hijo.nombre_niño} de la lista de ${nombreTutorEdit}?`);
+    if (!confirmar) return;
 
-  setLoading(true); // Opcional: mostrar carga
-  try {
-    // CAMBIO: Usar POST y enviar el objeto JSON que espera tu struct de Go
-    await axios.post(`${API_URL}/desvincular-hijo`, {
-      padre_id: parseInt(padreId),
-      hijo_id: parseInt(hijo.id)
-    });
+    setLoading(true); 
+    try {
+      await api.post(`/desvincular-hijo`, {
+        padre_id: parseInt(padreId),
+        hijo_id: parseInt(hijo.id)
+      });
 
-    alert("✅ Desvinculación exitosa");
-    cargarHijosActuales();
-  } catch (err) {
-    console.error(err);
-    alert("❌ Error al desvincular: " + (err.response?.data?.mensaje || "Error desconocido"));
-  } finally {
-    setLoading(false);
-  }
-};
+      alert("✅ Desvinculación exitosa");
+      cargarHijosActuales();
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al desvincular: " + (err.response?.data?.mensaje || "Error desconocido"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const manejarAltaHijo = async (hijo) => {
     if (!window.confirm(`¿Activar a ${hijo.nombre_niño}?`)) return;
     try {
-      await axios.patch(`${API_URL}/hijos/${hijo.id}/activar`);
+      await api.patch(`/hijos/${hijo.id}/activar`);
       cargarHijosActuales();
     } catch (err) {
       alert("Error al reactivar");
@@ -169,12 +168,12 @@ const manejarDesvincular = async (hijo) => {
       for (const hijo of nuevosPorGuardar) {
         let idHijoFinal = hijo.id;
         if (hijo.esNuevo) {
-          const resHijo = await axios.post(`${API_URL}/registrar-hijo`, { 
+          const resHijo = await api.post(`/registrar-hijo`, { 
             nombre_niño: hijo.nombre_niño 
           });
           idHijoFinal = resHijo.data.id;
         }
-        await axios.post(`${API_URL}/vincular-tutor`, { 
+        await api.post(`/vincular-tutor`, { 
           padre_id: parseInt(padreId), 
           hijo_id: idHijoFinal 
         });
@@ -190,7 +189,7 @@ const manejarDesvincular = async (hijo) => {
 
   return (
     <div className="p-8 bg-white text-slate-900 max-h-[90vh] overflow-y-auto rounded-[2.5rem] relative">
-      {/* CABECERA TUTOR */}
+      {/* El resto del JSX se mantiene exactamente igual */}
       <div className="flex justify-between items-start mb-10 border-b border-slate-100 pb-8 pr-12">
         <div className="flex-1">
           <p className="text-violet-600 font-black uppercase text-[10px] tracking-[0.2em] mb-2">Tutor Registrado</p>
@@ -218,7 +217,6 @@ const manejarDesvincular = async (hijo) => {
 
       <div className="grid md:grid-cols-2 gap-12">
         <div className="space-y-8">
-          {/* BUSCADOR */}
           <div className="bg-slate-50 p-7 rounded-[2.5rem] border border-slate-100 shadow-sm">
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-5 ml-2 tracking-widest">Vincular de la lista general</h4>
             <div className="relative">
@@ -243,7 +241,6 @@ const manejarDesvincular = async (hijo) => {
             </div>
           </div>
 
-          {/* NUEVO REGISTRO */}
           <div className="bg-slate-50 p-7 rounded-[2.5rem] border border-slate-100 shadow-sm">
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-5 ml-2 tracking-widest">Nuevo registro de niño</h4>
             <div className="flex gap-3">
@@ -259,7 +256,6 @@ const manejarDesvincular = async (hijo) => {
           </div>
         </div>
 
-        {/* LISTA DE HIJOS */}
         <div className="bg-white p-7 rounded-[3rem] border-2 border-slate-50 shadow-inner">
           <div className="flex justify-between items-center mb-8 px-2">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Familia vinculada</h3>

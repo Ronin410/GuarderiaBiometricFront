@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import axios from 'axios';
+// 1. IMPORTAMOS TU INSTANCIA CONFIGURADA
+import api from './axiosConfig'; 
 import { 
   UserPlus, ScanEye, Baby, AlertCircle, Users, Search, 
   ClipboardList, TrendingUp, ShieldCheck, ArrowRightCircle, 
@@ -11,23 +12,14 @@ import GestionHijos from './GestionHijos';
 import VistaBitacora from './VistaBitacora';
 import PanelReportes from './PanelReportes';
 
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  const slug = localStorage.getItem('guarderia_slug');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (slug) config.headers['X-Guarderia-Slug'] = slug;
-  return config;
-});
-
-const API_URL = 'https://guarderiabiometricback.onrender.com';
-//const API_URL = 'http://localhost:8099';
+// --- YA NO NECESITAMOS EL INTERCEPTOR NI API_URL AQUÍ ---
 
 // Configuración para cámara VERTICAL (Portrait)
 const videoConstraints = {
   width: { ideal: 720 },
   height: { ideal: 1280 },
   facingMode: "user",
-  aspectRatio: 0.75 // Relación 3:4 (más alto que ancho)
+  aspectRatio: 0.75 
 };
 
 function App() {
@@ -56,7 +48,8 @@ function App() {
 
   const cargarTodosLosPadres = async () => {
     try {
-      const res = await axios.get(`${API_URL}/buscar-padres?q=`);
+      // 2. CAMBIO A RUTAS RELATIVAS USANDO 'api'
+      const res = await api.get('/buscar-padres?q=');
       setTutoresEncontrados(res.data || []);
     } catch (err) { console.error("Error:", err); }
   };
@@ -80,7 +73,7 @@ function App() {
   const manejarLoginPrincipal = async (e) => {
     if (e) e.preventDefault();
     try {
-      const res = await axios.post(`${API_URL}/login`, { username: loginUsername, password: loginPassword });
+      const res = await api.post('/login', { username: loginUsername, password: loginPassword });
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('role', res.data.rol);
@@ -109,7 +102,7 @@ function App() {
 
   const verificarPinAdmin = async () => {
     try {
-      const res = await axios.post(`${API_URL}/verificar-pin`, { pin: adminPin });
+      const res = await api.post('/verificar-pin', { pin: adminPin });
       if (res.data.message === "PIN válido") {
         setTab(tabPendiente);
         setShowAdminPinModal(false);
@@ -119,23 +112,22 @@ function App() {
   };
 
   const procesarRostro = async (endpoint) => {
-if (endpoint === 'registrar' && !nombre.trim()) {
-    alert("⚠️ Error: No has escrito un nombre para el registro.");
-    return; // Esto detiene la función y no deja que siga al axios
-  }
+    if (endpoint === 'registrar' && !nombre.trim()) {
+      alert("⚠️ Error: No has escrito un nombre para el registro.");
+      return;
+    }
 
-  // 2. Validar cámara
-  if (!webcamRef.current) return;
-  const imageSrc = webcamRef.current.getScreenshot();
-  if (!imageSrc) {
-    alert("No se pudo capturar la imagen de la cámara.");
-    return;
-  }
+    if (!webcamRef.current) return;
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) {
+      alert("No se pudo capturar la imagen de la cámara.");
+      return;
+    }
     setLoading(true);
     const base64Image = imageSrc.split(',')[1];
     try {
       const payload = { imagen: base64Image, collection_id: `guarderia-rostros`, ...(endpoint === 'registrar' && { nombre }) };
-      const response = await axios.post(`${API_URL}/${endpoint}`, payload);
+      const response = await api.post(`/${endpoint}`, payload);
       setResultado({ type: 'success', data: { ...response.data, nombre: endpoint === 'registrar' ? nombre : (response.data.nombre || response.data.padre) } });
       
       setSeleccionados([]);
@@ -173,7 +165,7 @@ if (endpoint === 'registrar' && !nombre.trim()) {
         const hijoInfo = resultado.data.hijos.find(h => (h.id || h.hijo_id) === hijoId);
         const datos = formAsistencia[hijoId] || {};
         const esSalida = hijoInfo.ultimo_estado === "ENTRADA";
-        return axios.post(`${API_URL}/confirmar-asistencia`, {
+        return api.post('/confirmar-asistencia', {
           padre_id: resultado.data.padre_id || resultado.data.id,
           hijo_id: hijoId,
           aseado: esSalida ? false : (datos.aseado || false),
@@ -210,8 +202,6 @@ if (endpoint === 'registrar' && !nombre.trim()) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 lg:p-8">
-      
-      {/* HEADER */}
       <header className="flex flex-col items-center mb-8 border-b border-slate-200 pb-6 gap-6 w-full">
         <div className="flex items-center gap-3">
           <div className="bg-violet-600 p-2 rounded-xl shadow-md"><ShieldCheck size={20} className="text-white" /></div>
@@ -246,7 +236,7 @@ if (endpoint === 'registrar' && !nombre.trim()) {
               </div>
               <input type="text" placeholder="Buscar tutor..." className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-slate-900 mb-6 transition-all" 
                 onChange={async (e) => {
-                  const res = await axios.get(`${API_URL}/buscar-padres?q=${e.target.value}`);
+                  const res = await api.get(`/buscar-padres?q=${e.target.value}`);
                   setTutoresEncontrados(res.data || []);
                 }} />
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -266,9 +256,7 @@ if (endpoint === 'registrar' && !nombre.trim()) {
 
         {(tab === 'identificar' || tab === 'registrar') && (
           <div className="flex flex-col items-center gap-8 animate-in fade-in duration-500">
-            
-            {/* CÁMARA VERTICAL (PORTRAIT) */}
-            <div className="w-full max-w-md space-y-6"> {/* max-w-md para que no sea excesivamente ancha en tablet */}
+            <div className="w-full max-w-md space-y-6">
                {tab === 'registrar' && (
                  <div className="space-y-2">
                    <label className="text-[10px] font-black uppercase text-slate-400 ml-4 tracking-widest">Nombre Completo</label>
@@ -276,7 +264,6 @@ if (endpoint === 'registrar' && !nombre.trim()) {
                  </div>
                )}
                
-               {/* Contenedor con Aspect Ratio Vertical 3:4 */}
                <div className="relative rounded-[3.5rem] overflow-hidden border-8 border-white bg-slate-200 shadow-2xl aspect-[3/4] mx-auto w-full group">
                   <Webcam 
                     audio={false} 
@@ -287,7 +274,6 @@ if (endpoint === 'registrar' && !nombre.trim()) {
                     mirrored={true} 
                   />
                   
-                  {/* Overlay decorativo de escaneo */}
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className="w-3/4 h-3/4 border-2 border-white/20 rounded-[3rem] relative">
                         <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-violet-500 rounded-tl-2xl" />
@@ -313,7 +299,6 @@ if (endpoint === 'registrar' && !nombre.trim()) {
                </button>
             </div>
 
-            {/* RESULTADOS ADAPTADOS AL ANCHO DE LA CÁMARA */}
             <div className="w-full max-w-md">
                {resultado ? (
                  <div className={`p-6 sm:p-8 rounded-[3rem] border-2 bg-white shadow-xl animate-in zoom-in duration-300 ${resultado.type === 'success' ? 'border-emerald-100' : 'border-rose-100'}`}>

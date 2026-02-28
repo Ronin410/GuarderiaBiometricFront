@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+// 1. Importamos la instancia configurada en lugar de axios directamente
+import api from './axiosConfig'; 
 import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw } from 'lucide-react';
 
-const API_URL = 'https://guarderiabiometricback.onrender.com';
-//const API_URL = 'http://localhost:8099';
+// Ya no necesitamos definir API_URL aquí
+// const API_URL = 'http://localhost:8099';
 
 const VistaBitacora = () => {
   const [niños, setNiños] = useState([]);
@@ -14,12 +15,14 @@ const VistaBitacora = () => {
   const fetchEstatus = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/bitacora`, {
+      // 2. Usamos 'api' y una ruta relativa. El interceptor manejará el 401 automáticamente.
+      const res = await api.get('/bitacora', {
         params: { fecha: fechaFiltro }
       });
       setNiños(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error al obtener estatus de alumnos", err);
+      // No es necesario redirigir aquí, el interceptor ya lo hizo si fue un 401
     } finally {
       setLoading(false);
     }
@@ -45,7 +48,7 @@ const VistaBitacora = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 -m-4 p-8"> {/* Fondo con ligero contraste */}
+    <div className="min-h-screen bg-slate-50/50 -m-4 p-8">
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
         
         {/* CABECERA Y FILTROS */}
@@ -56,13 +59,13 @@ const VistaBitacora = () => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-            <div className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 px-4 focus-within:ring-2 focus-within:ring-violet-500 transition-all">
+            <div className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 px-4 focus-within:ring-2 focus-within:ring-violet-500 transition-all shadow-sm">
               <Calendar size={20} className="text-slate-400" />
               <input 
                 type="date" 
                 value={fechaFiltro}
                 onChange={(e) => setFechaFiltro(e.target.value)}
-                className="bg-transparent p-4 text-slate-900 outline-none font-bold text-sm w-full"
+                className="bg-transparent p-4 text-slate-900 outline-none font-bold text-sm w-full cursor-pointer"
               />
             </div>
             
@@ -103,7 +106,6 @@ const VistaBitacora = () => {
               <div key={niño.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-md hover:shadow-2xl hover:shadow-slate-300/60 transition-all duration-300 group flex flex-col justify-between h-full border-b-4 border-b-slate-200 hover:border-b-violet-500">
                 
                 <div>
-                  {/* Cabecera Tarjeta */}
                   <div className="flex items-center gap-4 mb-6">
                     <div className="bg-slate-100 p-4 rounded-2xl text-slate-600 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
                       <User size={24} />
@@ -115,12 +117,10 @@ const VistaBitacora = () => {
                     </div>
                   </div>
 
-                  {/* Estatus Principal */}
                   <div className={`w-full py-3 rounded-2xl text-center text-[11px] font-black border uppercase tracking-[0.2em] mb-4 ${getBadgeStyle(niño.estatus)}`}>
                     {niño.estatus === 'AUSENTE' ? '🏠 En Casa' : niño.estatus}
                   </div>
 
-                  {/* Indicadores Secundarios */}
                   <div className="grid grid-cols-2 gap-3 mb-6">
                     <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.aseado ? 'bg-white border-blue-500 text-blue-600' : 'bg-rose-50 border-rose-200 text-rose-500'}`}>
                       <CheckCircle size={18}/>
@@ -134,7 +134,6 @@ const VistaBitacora = () => {
                   </div>
                 </div>
 
-                {/* Pie de Tarjeta - Hora */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2">
                   <Clock size={14} className="text-violet-500"/>
                   <span className="text-xs font-bold text-slate-500">
