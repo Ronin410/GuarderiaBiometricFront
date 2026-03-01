@@ -91,3 +91,11 @@
     page-break-after: auto;
   }
 }
+
+body {
+  /* Asegura que el contenido respete las áreas seguras de los móviles */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  height: 100vh;
+  overflow: hidden; /* Evita rebotes innecesarios */
+}

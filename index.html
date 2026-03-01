@@ -1,10 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>guarderia-frontend</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>Sistema Biométrico - Guardería</title>
+
+    <meta name="theme-color" content="#7c3aed" /> 
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Guardería" />
+    
+    <link rel="manifest" href="/manifest.webmanifest" />
+    
+    <link rel="apple-touch-icon" href="/logo192.png" />
+
+    <style>
+      /* Previene el rebote elástico en iOS y asegura el llenado de pantalla */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #ffffff;
+        overscroll-behavior-y: contain;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      #root {
+        height: 100%;
+      }
+
+      :root {
+        /* Variables para manejar el notch de los celulares modernos */
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
