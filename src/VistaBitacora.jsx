@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from './axiosConfig'; 
-import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw } from 'lucide-react';
+import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw, MessageSquare } from 'lucide-react';
 
 const VistaBitacora = () => {
   const [niños, setNiños] = useState([]);
@@ -115,8 +115,7 @@ const VistaBitacora = () => {
                     {niño.estatus === 'AUSENTE' ? '🏠 En Casa' : niño.estatus}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    {/* BOTÓN DE ASEO MODIFICADO */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${
                       niño.aseado 
                         ? 'bg-white border-blue-500 text-blue-600' 
@@ -124,7 +123,7 @@ const VistaBitacora = () => {
                     }`}>
                       <CheckCircle size={18}/>
                       <span className="text-[9px] font-black uppercase tracking-tighter">
-                        Limpio
+                        {niño.aseado ? 'Limpio' : 'Cambio'}
                       </span>
                     </div>
 
@@ -133,6 +132,19 @@ const VistaBitacora = () => {
                       <span className="text-[9px] font-black uppercase tracking-tighter">{niño.golpe ? 'Golpe' : 'Sin Novedad'}</span>
                     </div>
                   </div>
+
+                  {/* NUEVA SECCIÓN: OBSERVACIONES */}
+                  {niño.observaciones && (
+                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group-hover:bg-violet-50/50 group-hover:border-violet-100 transition-colors">
+                      <div className="flex items-center gap-2 mb-1 text-slate-400 group-hover:text-violet-400">
+                        <MessageSquare size={12} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Observaciones</span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-600 italic leading-relaxed">
+                        "{niño.observaciones}"
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2">
