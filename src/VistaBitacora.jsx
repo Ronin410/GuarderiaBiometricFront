@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
-// 1. Importamos la instancia configurada en lugar de axios directamente
 import api from './axiosConfig'; 
 import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw } from 'lucide-react';
-
-// Ya no necesitamos definir API_URL aquí
-// const API_URL = 'http://localhost:8099';
 
 const VistaBitacora = () => {
   const [niños, setNiños] = useState([]);
@@ -15,14 +11,12 @@ const VistaBitacora = () => {
   const fetchEstatus = async () => {
     setLoading(true);
     try {
-      // 2. Usamos 'api' y una ruta relativa. El interceptor manejará el 401 automáticamente.
       const res = await api.get('/bitacora', {
         params: { fecha: fechaFiltro }
       });
       setNiños(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error al obtener estatus de alumnos", err);
-      // No es necesario redirigir aquí, el interceptor ya lo hizo si fue un 401
     } finally {
       setLoading(false);
     }
@@ -122,9 +116,16 @@ const VistaBitacora = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.aseado ? 'bg-white border-blue-500 text-blue-600' : 'bg-rose-50 border-rose-200 text-rose-500'}`}>
+                    {/* BOTÓN DE ASEO MODIFICADO */}
+                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${
+                      niño.aseado 
+                        ? 'bg-white border-blue-500 text-blue-600' 
+                        : 'bg-rose-50 border-rose-500 text-rose-600 animate-pulse'
+                    }`}>
                       <CheckCircle size={18}/>
-                      <span className="text-[9px] font-black uppercase tracking-tighter">{niño.aseado ? 'Limpio' : 'Cambio'}</span>
+                      <span className="text-[9px] font-black uppercase tracking-tighter">
+                        Limpio
+                      </span>
                     </div>
 
                     <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.golpe ? 'bg-amber-50 border-amber-500 text-amber-600 animate-pulse shadow-lg shadow-amber-200' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>

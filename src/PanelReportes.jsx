@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// 1. Importamos la configuración personalizada en lugar de axios directamente
 import api from './axiosConfig'; 
-import { Download, UserCheck, RefreshCw, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
-
-// Ya no necesitamos definir API_URL aquí porque está dentro de axiosConfig
-// const API_URL = 'http://localhost:8099';
+import { Download, RefreshCw, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
 
 const stylePrint = `
   @media print {
@@ -61,13 +57,19 @@ const PanelReportes = () => {
 
   const nombreGuarderia = localStorage.getItem('nombre_guarderia') || 'BioSafe Kiosk';
 
+  /**
+   * CORRECCIÓN DE FECHA: Evita el uso de UTC (Z) para que no 
+   * reste horas y cambie el día en el reporte.
+   */
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return "--:--";
     try {
       const [fechaPart, horaPart] = fechaStr.split(' ');
       const [dia, mes, año] = fechaPart.split('/');
-      const fechaUTC = new Date(`${año}-${mes}-${dia}T${horaPart}:00Z`);
-      return fechaUTC.toLocaleString('es-MX', {
+      // Creamos la fecha como local (sin Z al final)
+      const fechaObj = new Date(`${año}-${mes}-${dia}T${horaPart}`);
+      
+      return fechaObj.toLocaleString('es-MX', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true
       });
@@ -78,13 +80,13 @@ const PanelReportes = () => {
     if (!fechaStr) return new Date(0);
     const [fecha, hora] = fechaStr.split(' ');
     const [dia, mes, año] = fecha.split('/');
-    return new Date(`${año}-${mes}-${dia}T${hora}:00Z`);
+    // Se parsea como local para mantener consistencia en el ordenamiento
+    return new Date(`${año}-${mes}-${dia}T${hora}`);
   };
 
   const obtenerReportes = async () => {
     setLoading(true);
     try {
-      // 2. Usamos 'api' en lugar de 'axios' y solo ponemos el endpoint relativo
       const res = await api.get('/reportes-asistencia', {
         params: { inicio: fechaInicio, fin: fechaFin }
       });
@@ -92,7 +94,6 @@ const PanelReportes = () => {
       datos.sort((a, b) => parseFechaBackend(a.fecha) - parseFechaBackend(b.fecha));
       setReportes(datos);
     } catch (error) {
-      // Si el error es 401, axiosConfig se encargará de redirigir antes de llegar aquí
       console.error("Error al obtener reportes", error);
     } finally {
       setLoading(false);
@@ -175,9 +176,25 @@ const PanelReportes = () => {
                     </span>
                   </td>
                   <td className="p-4">
-                    <div className="flex justify-center gap-1">
-                      <CheckCircle size={16} className={reg.aseado ? 'text-blue-500' : 'text-slate-200'} />
-                      <ShieldAlert size={16} className={reg.reporte_golpe ? 'text-red-500 animate-pulse' : 'text-slate-200'} />
+                    <div className="flex justify-center items-center gap-2">
+                      {/* ASEADO: Verde si es true, Oscuro si es false */}
+                      <div className="flex flex-col items-center">
+                        <CheckCircle 
+                          size={18} 
+                          className={reg.aseado ? 'text-emerald-500' : 'text-slate-900'} 
+                        />
+                        <span className={`text-[7px] font-black uppercase ${reg.aseado ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          {reg.aseado ? 'Aseado' : 'No Aseado'}
+                        </span>
+                      </div>
+
+                      {/* GOLPE: Solo se muestra si es true */}
+                      {reg.reporte_golpe && (
+                        <div className="flex flex-col items-center">
+                          <ShieldAlert size={18} className="text-red-500 animate-pulse" />
+                          <span className="text-[7px] font-black uppercase text-red-600">Golpe</span>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="p-4 text-[10px] italic text-slate-600 text-left-print">{reg.observaciones || "-"}</td>

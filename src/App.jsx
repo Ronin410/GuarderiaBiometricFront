@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
-// 1. IMPORTAMOS TU INSTANCIA CONFIGURADA
 import api from './axiosConfig'; 
 import { 
   UserPlus, ScanEye, Baby, AlertCircle, Users, Search, 
@@ -12,9 +11,6 @@ import GestionHijos from './GestionHijos';
 import VistaBitacora from './VistaBitacora';
 import PanelReportes from './PanelReportes';
 
-// --- YA NO NECESITAMOS EL INTERCEPTOR NI API_URL AQUÍ ---
-
-// Configuración para cámara VERTICAL (Portrait)
 const videoConstraints = {
   width: { ideal: 720 },
   height: { ideal: 1280 },
@@ -46,12 +42,13 @@ function App() {
   const [formAsistencia, setFormAsistencia] = useState({});
   const [seleccionados, setSeleccionados] = useState([]);
 
-  const cargarTodosLosPadres = async () => {
+  const cargarTodosLosPadres = async (query = '') => {
     try {
-      // 2. CAMBIO A RUTAS RELATIVAS USANDO 'api'
-      const res = await api.get('/buscar-padres?q=');
+      const res = await api.get(`/buscar-padres?q=${query}`);
       setTutoresEncontrados(res.data || []);
-    } catch (err) { console.error("Error:", err); }
+    } catch (err) { 
+      console.error("Error cargando padres:", err); 
+    }
   };
 
   useEffect(() => {
@@ -83,11 +80,21 @@ function App() {
         setUserRole(res.data.rol);
         setGuarderiaInfo({ nombre: res.data.guarderia_nombre, slug: res.data.guarderia_slug });
       }
-    } catch (error) { alert("Credenciales incorrectas"); }
+    } catch (error) { 
+      alert("Credenciales incorrectas"); 
+    }
+  };
+
+  const cerrarSesion = () => {
+    localStorage.clear();
+    setIsLoggedIn(false);
+    setUserRole(null);
+    window.location.reload();
   };
 
   const cambiarTab = (targetTab) => {
     const tabsProtegidas = ['admin', 'bitacora', 'reportes'];
+    // Si el usuario ya es admin, entra directo. Si no, pide PIN.
     if (tabsProtegidas.includes(targetTab) && userRole !== 'admin') {
       setTabPendiente(targetTab);
       setShowAdminPinModal(true);
@@ -108,7 +115,10 @@ function App() {
         setShowAdminPinModal(false);
         setAdminPin('');
       }
-    } catch (error) { alert("PIN incorrecto"); setAdminPin(''); }
+    } catch (error) { 
+      alert("PIN incorrecto"); 
+      setAdminPin(''); 
+    }
   };
 
   const procesarRostro = async (endpoint) => {
@@ -123,12 +133,24 @@ function App() {
       alert("No se pudo capturar la imagen de la cámara.");
       return;
     }
+    
     setLoading(true);
     const base64Image = imageSrc.split(',')[1];
     try {
-      const payload = { imagen: base64Image, collection_id: `guarderia-rostros`, ...(endpoint === 'registrar' && { nombre }) };
+      const payload = { 
+        imagen: base64Image, 
+        collection_id: `guarderia-rostros`, 
+        ...(endpoint === 'registrar' && { nombre }) 
+      };
       const response = await api.post(`/${endpoint}`, payload);
-      setResultado({ type: 'success', data: { ...response.data, nombre: endpoint === 'registrar' ? nombre : (response.data.nombre || response.data.padre) } });
+      
+      setResultado({ 
+        type: 'success', 
+        data: { 
+          ...response.data, 
+          nombre: endpoint === 'registrar' ? nombre : (response.data.nombre || response.data.padre) 
+        } 
+      });
       
       setSeleccionados([]);
       setFormAsistencia({});
@@ -138,14 +160,18 @@ function App() {
         setMostrarModalGestion(true);
         setNombre('');
       }
-    } catch (error) { setResultado({ type: 'error', msg: error.response?.data?.error || 'No reconocido' }); }
-    finally { setLoading(false); }
+    } catch (error) { 
+      setResultado({ type: 'error', msg: error.response?.data?.error || 'No reconocido' }); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const manejarToggleHijo = (hijo) => {
     const hID = hijo.id || hijo.hijo_id;
     const estado = hijo.ultimo_estado;
     if (estado === "SALIDA") return;
+
     if (!seleccionados.includes(hID)) {
       if (estado === "ENTRADA") {
         const confirmar = window.confirm(`El niño ${hijo.nombre_niño || hijo.nombre} ya está en la guardería. ¿Deseas registrar su SALIDA?`);
@@ -165,6 +191,7 @@ function App() {
         const hijoInfo = resultado.data.hijos.find(h => (h.id || h.hijo_id) === hijoId);
         const datos = formAsistencia[hijoId] || {};
         const esSalida = hijoInfo.ultimo_estado === "ENTRADA";
+        
         return api.post('/confirmar-asistencia', {
           padre_id: resultado.data.padre_id || resultado.data.id,
           hijo_id: hijoId,
@@ -177,8 +204,11 @@ function App() {
       alert("Movimientos registrados con éxito");
       setResultado(null);
       setSeleccionados([]);
-    } catch (error) { alert("Error al procesar registros"); } 
-    finally { setLoading(false); }
+    } catch (error) { 
+      alert("Error al procesar registros"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   if (!isLoggedIn) {
@@ -218,7 +248,7 @@ function App() {
             <button onClick={() => cambiarTab('admin')} className={`px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all ${tab === 'admin' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Users size={18} /> Familia</button>
             <button onClick={() => cambiarTab('bitacora')} className={`px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all ${tab === 'bitacora' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><ClipboardList size={18} /> Bitácora</button>
             <button onClick={() => cambiarTab('reportes')} className={`px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all ${tab === 'reportes' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><TrendingUp size={18} /> Reportes</button>
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="px-3 py-2 text-rose-500 hover:bg-rose-50 rounded-xl ml-2 border-l border-slate-100"><LogOut size={18} /></button>
+            <button onClick={cerrarSesion} className="px-3 py-2 text-rose-500 hover:bg-rose-50 rounded-xl ml-2 border-l border-slate-100"><LogOut size={18} /></button>
           </div>
         </nav>
       </header>
@@ -232,23 +262,27 @@ function App() {
             <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl">
               <div className="flex items-center gap-4 mb-6">
                 <div className="bg-violet-100 p-3 rounded-2xl text-violet-600"><Search size={28} /></div>
-                <h3 className="text-xl font-black uppercase text-slate-900">Directorio</h3>
+                <h3 className="text-xl font-black uppercase text-slate-900">Directorio de Tutores</h3>
               </div>
-              <input type="text" placeholder="Buscar tutor..." className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-slate-900 mb-6 transition-all" 
-                onChange={async (e) => {
-                  const res = await api.get(`/buscar-padres?q=${e.target.value}`);
-                  setTutoresEncontrados(res.data || []);
-                }} />
+              <input 
+                type="text" 
+                placeholder="Buscar por nombre..." 
+                className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-slate-900 mb-6 transition-all" 
+                onChange={(e) => cargarTodosLosPadres(e.target.value)} 
+              />
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 {tutoresEncontrados.map(tutor => (
-                  <button key={tutor.id} onClick={() => { setPadreSeleccionado(tutor); setMostrarModalGestion(true); }} className="w-full bg-slate-50 border border-slate-100 hover:bg-violet-50 p-4 rounded-xl flex justify-between items-center group transition-all">
-                    <div className="text-left">
+                  <button key={tutor.id} onClick={() => { setPadreSeleccionado(tutor); setMostrarModalGestion(true); }} className="w-full bg-slate-50 border border-slate-100 hover:bg-violet-50 p-4 rounded-xl flex justify-between items-center group transition-all text-left">
+                    <div>
                       <p className="font-black uppercase text-slate-900">{tutor.nombre}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{tutor.hijos?.length || 0} hijos</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{tutor.hijos?.length || 0} hijos registrados</p>
                     </div>
                     <ArrowRightCircle size={20} className="text-slate-300 group-hover:text-violet-600" />
                   </button>
                 ))}
+                {tutoresEncontrados.length === 0 && (
+                  <p className="text-center py-10 text-slate-400 font-bold uppercase text-xs">No se encontraron resultados</p>
+                )}
               </div>
             </div>
           </div>
@@ -259,7 +293,7 @@ function App() {
             <div className="w-full max-w-md space-y-6">
                {tab === 'registrar' && (
                  <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase text-slate-400 ml-4 tracking-widest">Nombre Completo</label>
+                   <label className="text-[10px] font-black uppercase text-slate-400 ml-4 tracking-widest">Nombre Completo del Tutor</label>
                    <input type="text" placeholder="Ej. Juan Pérez" value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none shadow-sm" />
                  </div>
                )}
@@ -293,7 +327,7 @@ function App() {
                <button 
                  onClick={() => procesarRostro(tab)} 
                  disabled={loading} 
-                 className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white rounded-[2rem] font-black uppercase text-xl shadow-lg active:scale-95 transition-all"
+                 className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white rounded-[2rem] font-black uppercase text-xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
                >
                  {loading ? 'Procesando...' : (tab === 'registrar' ? 'Confirmar Registro' : 'Escanear Rostro')}
                </button>
@@ -314,9 +348,9 @@ function App() {
                           <p className="text-xl font-bold text-slate-900 uppercase">{resultado.data.nombre}</p>
                         </div>
 
-                        {resultado.data.hijos?.length > 0 && (
+                        {resultado.data.hijos?.length > 0 ? (
                           <div className="space-y-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado de los Niños:</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Niños:</p>
                             {resultado.data.hijos.map((h, i) => {
                               const hID = h.id || h.hijo_id;
                               const estaSeleccionado = seleccionados.includes(hID);
@@ -331,7 +365,7 @@ function App() {
                                         <input type="checkbox" disabled={yaSalio} checked={estaSeleccionado} onChange={() => manejarToggleHijo(h)} className={`w-6 h-6 rounded-lg ${yaSalio ? 'cursor-not-allowed' : 'accent-violet-600 cursor-pointer'}`} />
                                         <div className="flex flex-col">
                                             <span className={`font-bold uppercase text-sm ${yaSalio ? 'line-through text-slate-400' : 'text-slate-700'}`}>{h.nombre_niño || h.nombre}</span>
-                                            {yaSalio && <span className="text-[8px] font-bold text-rose-500 uppercase">Salida registrada</span>}
+                                            {yaSalio && <span className="text-[8px] font-bold text-rose-500 uppercase">Salida ya registrada</span>}
                                         </div>
                                     </div>
                                     <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${estaDentro ? 'bg-emerald-100 text-emerald-700' : yaSalio ? 'bg-slate-200 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>
@@ -342,14 +376,14 @@ function App() {
                                   {estaSeleccionado && !estaDentro && !yaSalio && (
                                     <div className="mt-4 space-y-3 pt-4 border-t border-violet-100">
                                         <div className="grid grid-cols-2 gap-2">
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                                {formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Aseado?'}
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-colors ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}>
+                                                {formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Viene Aseado?'}
                                             </button>
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                                {formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Golpes?'}
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-colors ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-400 border-slate-200'}`}>
+                                                {formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Trae Golpes?'}
                                             </button>
                                         </div>
-                                        <input type="text" placeholder="Notas de entrada..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs outline-none focus:ring-1 focus:ring-violet-300" onChange={(e) => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], observaciones: e.target.value}})} />
+                                        <input type="text" placeholder="Observaciones de entrada..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs outline-none focus:ring-1 focus:ring-violet-300" onChange={(e) => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], observaciones: e.target.value}})} />
                                     </div>
                                   )}
 
@@ -357,7 +391,7 @@ function App() {
                                     <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <LogOutIcon size={14} className="text-blue-600" />
-                                            <span className="text-[10px] font-bold text-blue-700 uppercase">Listo para SALIDA</span>
+                                            <span className="text-[10px] font-bold text-blue-700 uppercase">Listo para registrar SALIDA</span>
                                         </div>
                                         <Clock size={14} className="text-blue-300" />
                                     </div>
@@ -370,14 +404,25 @@ function App() {
                                 Confirmar {seleccionados.length} Movimiento(s)
                             </button>
                           </div>
+                        ) : (
+                          <div className="text-center p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                             <Baby size={32} className="mx-auto text-amber-400 mb-2" />
+                             <p className="text-sm font-bold text-amber-800 uppercase">Sin niños asignados</p>
+                             <p className="text-[10px] text-amber-600 uppercase mt-1">Contacte al administrador para vincular hijos.</p>
+                          </div>
                         )}
                       </div>
-                    ) : <p className="text-rose-600 font-bold bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">{resultado.msg}</p>}
+                    ) : (
+                      <div className="space-y-4">
+                        <p className="text-rose-600 font-bold bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">{resultado.msg}</p>
+                        <button onClick={() => setResultado(null)} className="w-full py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600">Reintentar</button>
+                      </div>
+                    )}
                  </div>
                ) : (
                  <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-slate-300 rounded-[3rem] text-slate-400 bg-white">
-                   <ScanEye size={48} className="mb-4 opacity-20" />
-                   <p className="font-bold uppercase text-[10px] tracking-widest leading-relaxed">Esperando escaneo biométrico</p>
+                    <ScanEye size={48} className="mb-4 opacity-20" />
+                    <p className="font-bold uppercase text-[10px] tracking-widest leading-relaxed">Esperando detección de rostro...</p>
                  </div>
                )}
             </div>
@@ -388,22 +433,36 @@ function App() {
       {/* MODALES */}
       {mostrarModalGestion && padreSeleccionado && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden relative border-t-8 border-t-violet-600 max-h-[90vh] overflow-y-auto">
-            <button onClick={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 z-10"><X size={32} /></button>
-            <GestionHijos padreId={padreSeleccionado.id} nombrePadre={padreSeleccionado.nombre} onFinalizar={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} />
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden relative border-t-8 border-t-violet-600 max-h-[90vh] flex flex-col">
+            <button onClick={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 z-10 p-2"><X size={32} /></button>
+            <div className="overflow-y-auto flex-1">
+              <GestionHijos 
+                padreId={padreSeleccionado.id} 
+                nombrePadre={padreSeleccionado.nombre} 
+                onFinalizar={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} 
+              />
+            </div>
           </div>
         </div>
       )}
 
       {showAdminPinModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center shadow-2xl">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200">
             <KeyRound size={40} className="mx-auto mb-4 text-amber-500" />
-            <h2 className="text-xl font-black text-slate-900 uppercase mb-6 tracking-tight">PIN Requerido</h2>
-            <input type="password" value={adminPin} onChange={(e) => setAdminPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && verificarPinAdmin()} className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none focus:ring-2 focus:ring-amber-500" autoFocus />
+            <h2 className="text-xl font-black text-slate-900 uppercase mb-6 tracking-tight">Acceso Protegido</h2>
+            <input 
+              type="password" 
+              value={adminPin} 
+              onChange={(e) => setAdminPin(e.target.value)} 
+              onKeyDown={(e) => e.key === 'Enter' && verificarPinAdmin()} 
+              className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none focus:ring-2 focus:ring-amber-500" 
+              autoFocus 
+              placeholder="****"
+            />
             <div className="flex gap-2">
               <button onClick={() => setShowAdminPinModal(false)} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs">Cancelar</button>
-              <button onClick={verificarPinAdmin} className="flex-1 bg-amber-500 py-3 rounded-xl font-black text-white uppercase shadow-lg">Validar</button>
+              <button onClick={verificarPinAdmin} className="flex-1 bg-amber-500 py-3 rounded-xl font-black text-white uppercase shadow-lg hover:bg-amber-600 transition-colors">Validar</button>
             </div>
           </div>
         </div>
