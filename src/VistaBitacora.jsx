@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import api from './axiosConfig'; 
-import { Calendar, User, CheckCircle, ShieldAlert, Clock, Search, RefreshCw, MessageSquare } from 'lucide-react';
+import { 
+  Calendar, User, CheckCircle, ShieldAlert, Clock, 
+  Search, RefreshCw, MessageSquare 
+} from 'lucide-react';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const VistaBitacora = () => {
   const [niños, setNiños] = useState([]);
@@ -26,6 +33,64 @@ const VistaBitacora = () => {
     fetchEstatus();
   }, [fechaFiltro]);
 
+  const handleCambiarEstatus = async (niño) => {
+    let nuevoEstatus = "";
+    let colorConfirmacion = "";
+    let textoAccion = "";
+
+    if (!niño.estatus || niño.estatus === 'AUSENTE' || niño.estatus === 'SALIDA') {
+      nuevoEstatus = 'ENTRADA';
+      textoAccion = "registrar la ENTRADA";
+      colorConfirmacion = '#10b981'; 
+    } else {
+      nuevoEstatus = 'SALIDA';
+      textoAccion = "registrar la SALIDA";
+      colorConfirmacion = '#f97316'; 
+    }
+
+    const result = await MySwal.fire({
+      title: <p className="text-xl font-black text-slate-900 uppercase tracking-tighter">¿Cambiar Estatus?</p>,
+      html: (
+        <div className="text-slate-600 text-sm space-y-2">
+          <p>Vas a {textoAccion} para:</p>
+          <p className="font-bold text-lg text-slate-900 uppercase">{niño.hijo || niño.nombre}</p>
+        </div>
+      ),
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'SÍ, ACTUALIZAR',
+      cancelButtonText: 'CANCELAR',
+      confirmButtonColor: colorConfirmacion,
+      cancelButtonColor: '#64748b',
+      borderRadius: '2rem',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.post('/admin/forzar-estatus', {
+          hijo_id: niño.hijo_id || niño.id, 
+          tipo_movimiento: nuevoEstatus
+        });
+        
+        MySwal.fire({
+          title: '¡Actualizado!',
+          icon: 'success',
+          timer: 1000,
+          showConfirmButton: false,
+          borderRadius: '2rem'
+        });
+
+        fetchEstatus(); 
+      } catch (err) {
+        MySwal.fire({
+          title: 'Error',
+          text: err.response?.data?.error || 'No se pudo completar la acción',
+          icon: 'error'
+        });
+      }
+    }
+  };
+
   const filtrados = niños.filter(n => 
     (n.hijo || n.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
   );
@@ -33,11 +98,11 @@ const VistaBitacora = () => {
   const getBadgeStyle = (estatus) => {
     switch(estatus) {
       case 'ENTRADA': 
-        return 'bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-200/50';
+        return 'bg-emerald-500 text-white border-emerald-400 hover:bg-emerald-600 shadow-emerald-200/50';
       case 'SALIDA': 
-        return 'bg-orange-500 text-white border-orange-400 shadow-lg shadow-orange-200/50';
+        return 'bg-orange-500 text-white border-orange-400 hover:bg-orange-600 shadow-orange-200/50';
       default: 
-        return 'bg-slate-100 text-slate-500 border-slate-200';
+        return 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200';
     }
   };
 
@@ -45,21 +110,21 @@ const VistaBitacora = () => {
     <div className="min-h-screen bg-slate-50/50 -m-4 p-8">
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
         
-        {/* CABECERA Y FILTROS */}
+        {/* CABECERA */}
         <div className="flex flex-col md:flex-row gap-6 items-center justify-between bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/60">
           <div className="flex flex-col gap-1">
-            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Bitácora de Asistencia</h3>
+            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Bitácora</h3>
             <div className="h-1 w-20 bg-violet-600 rounded-full"></div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-            <div className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 px-4 focus-within:ring-2 focus-within:ring-violet-500 transition-all shadow-sm">
+            <div className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 px-4">
               <Calendar size={20} className="text-slate-400" />
               <input 
                 type="date" 
                 value={fechaFiltro}
                 onChange={(e) => setFechaFiltro(e.target.value)}
-                className="bg-transparent p-4 text-slate-900 outline-none font-bold text-sm w-full cursor-pointer"
+                className="bg-transparent p-4 text-slate-900 outline-none font-bold text-sm cursor-pointer"
               />
             </div>
             
@@ -67,82 +132,62 @@ const VistaBitacora = () => {
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20}/>
               <input 
                 type="text"
-                placeholder="Buscar por nombre..."
+                placeholder="Buscar niño..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full bg-slate-100 border border-slate-200 pl-14 pr-6 py-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 font-medium transition-all shadow-inner"
+                className="w-full bg-slate-100 border border-slate-200 pl-14 pr-6 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-violet-500 font-medium transition-all"
               />
             </div>
 
-            <button 
-              onClick={fetchEstatus}
-              className="p-4 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 shadow-lg shadow-violet-300 transition-all active:scale-95"
-            >
+            <button onClick={fetchEstatus} className="p-4 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 shadow-lg transition-all">
               <RefreshCw size={24} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
 
-        {/* GRID DE TARJETAS */}
+        {/* GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {loading ? (
-            <div className="col-span-full py-20 text-center">
-              <RefreshCw className="animate-spin mx-auto text-violet-500 mb-4" size={48} />
-              <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Sincronizando registros...</p>
-            </div>
-          ) : filtrados.length === 0 ? (
-            <div className="col-span-full bg-white border-2 border-dashed border-slate-200 rounded-[3rem] py-24 text-center">
-              <User size={64} className="mx-auto text-slate-200 mb-4" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No se encontraron movimientos</p>
-            </div>
+            <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Sincronizando...</div>
           ) : (
             filtrados.map(niño => (
-              <div key={niño.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-md hover:shadow-2xl hover:shadow-slate-300/60 transition-all duration-300 group flex flex-col justify-between h-full border-b-4 border-b-slate-200 hover:border-b-violet-500">
+              <div key={niño.id || niño.hijo_id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-md hover:shadow-xl transition-all group flex flex-col justify-between border-b-4 hover:border-b-violet-500">
                 
                 <div>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="bg-slate-100 p-4 rounded-2xl text-slate-600 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="bg-slate-100 p-4 rounded-2xl text-slate-600 group-hover:bg-violet-600 group-hover:text-white transition-all">
                       <User size={24} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-tight">
+                      <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-tight line-clamp-1">
                         {niño.hijo || niño.nombre}
                       </h4>
                     </div>
                   </div>
 
-                  <div className={`w-full py-3 rounded-2xl text-center text-[11px] font-black border uppercase tracking-[0.2em] mb-4 ${getBadgeStyle(niño.estatus)}`}>
+                  {/* ESTATUS CONVERTIDO EN BOTÓN DISCRETO */}
+                  <button
+                    onClick={() => handleCambiarEstatus(niño)}
+                    className={`w-full py-3 rounded-2xl text-[11px] font-black border uppercase tracking-[0.2em] mb-6 transition-all active:scale-95 shadow-lg ${getBadgeStyle(niño.estatus)}`}
+                  >
                     {niño.estatus === 'AUSENTE' ? '🏠 En Casa' : niño.estatus}
-                  </div>
+                  </button>
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${
-                      niño.aseado 
-                        ? 'bg-white border-blue-500 text-blue-600' 
-                        : 'bg-rose-50 border-rose-500 text-rose-600 animate-pulse'
-                    }`}>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 ${niño.aseado ? 'border-blue-500 text-blue-600' : 'bg-rose-50 border-rose-500 text-rose-600 animate-pulse'}`}>
                       <CheckCircle size={18}/>
-                      <span className="text-[9px] font-black uppercase tracking-tighter">
-                        {niño.aseado ? 'Limpio' : 'Cambio'}
-                      </span>
+                      <span className="text-[9px] font-black uppercase">{niño.aseado ? 'Limpio' : 'Cambio'}</span>
                     </div>
 
-                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.golpe ? 'bg-amber-50 border-amber-500 text-amber-600 animate-pulse shadow-lg shadow-amber-200' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
+                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 ${niño.golpe ? 'bg-amber-50 border-amber-500 text-amber-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
                       <ShieldAlert size={18}/>
-                      <span className="text-[9px] font-black uppercase tracking-tighter">{niño.golpe ? 'Golpe' : 'Sin Novedad'}</span>
+                      <span className="text-[9px] font-black uppercase">{niño.golpe ? 'Golpe' : 'Normal'}</span>
                     </div>
                   </div>
 
-                  {/* NUEVA SECCIÓN: OBSERVACIONES */}
                   {niño.observaciones && (
-                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group-hover:bg-violet-50/50 group-hover:border-violet-100 transition-colors">
-                      <div className="flex items-center gap-2 mb-1 text-slate-400 group-hover:text-violet-400">
-                        <MessageSquare size={12} />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Observaciones</span>
-                      </div>
-                      <p className="text-xs font-medium text-slate-600 italic leading-relaxed">
-                        "{niño.observaciones}"
-                      </p>
+                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 italic text-xs text-slate-600 line-clamp-2">
+                      "{niño.observaciones}"
                     </div>
                   )}
                 </div>
@@ -150,7 +195,7 @@ const VistaBitacora = () => {
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2">
                   <Clock size={14} className="text-violet-500"/>
                   <span className="text-xs font-bold text-slate-500">
-                    {niño.fecha ? new Date(niño.fecha).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                    {niño.fecha_hora ? new Date(niño.fecha_hora).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
                   </span>
                 </div>
 
