@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from './axiosConfig'; 
 import { 
   Calendar, User, CheckCircle, ShieldAlert, Clock, 
-  Search, RefreshCw, MessageSquare 
+  Search, RefreshCw 
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -53,7 +53,7 @@ const VistaBitacora = () => {
       html: (
         <div className="text-slate-600 text-sm space-y-2">
           <p>Vas a {textoAccion} para:</p>
-          <p className="font-bold text-lg text-slate-900 uppercase">{niño.hijo || niño.nombre}</p>
+          <p className="font-bold text-lg text-slate-900 uppercase">{niño.hijo}</p>
         </div>
       ),
       icon: 'question',
@@ -68,14 +68,14 @@ const VistaBitacora = () => {
     if (result.isConfirmed) {
       try {
         await api.post('/admin/forzar-estatus', {
-          hijo_id: niño.hijo_id || niño.id, 
+          hijo_id: niño.id, 
           tipo_movimiento: nuevoEstatus
         });
         
         MySwal.fire({
           title: '¡Actualizado!',
           icon: 'success',
-          timer: 1000,
+          timer: 800,
           showConfirmButton: false,
           borderRadius: '2rem'
         });
@@ -92,7 +92,7 @@ const VistaBitacora = () => {
   };
 
   const filtrados = niños.filter(n => 
-    (n.hijo || n.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
+    (n.hijo || "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
   const getBadgeStyle = (estatus) => {
@@ -139,33 +139,40 @@ const VistaBitacora = () => {
               />
             </div>
 
-            <button onClick={fetchEstatus} className="p-4 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 shadow-lg transition-all">
+            <button onClick={fetchEstatus} className="p-4 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 shadow-lg transition-all active:scale-95">
               <RefreshCw size={24} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
 
-        {/* GRID */}
+        {/* GRID DE NIÑOS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {loading ? (
-            <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Sincronizando...</div>
+            <div className="col-span-full py-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">
+              Sincronizando registros...
+            </div>
+          ) : filtrados.length === 0 ? (
+            <div className="col-span-full py-20 text-center text-slate-400 font-medium">
+              No se encontraron alumnos para esta fecha o búsqueda.
+            </div>
           ) : (
             filtrados.map(niño => (
-              <div key={niño.id || niño.hijo_id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-md hover:shadow-xl transition-all group flex flex-col justify-between border-b-4 hover:border-b-violet-500">
+              <div key={niño.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-md hover:shadow-xl transition-all group flex flex-col justify-between border-b-4 hover:border-b-violet-500 min-h-fit">
                 
                 <div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="bg-slate-100 p-4 rounded-2xl text-slate-600 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="bg-slate-100 p-4 rounded-2xl text-slate-600 group-hover:bg-violet-600 group-hover:text-white transition-all shrink-0">
                       <User size={24} />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-tight line-clamp-1">
-                        {niño.hijo || niño.nombre}
+                    <div className="flex-1 min-w-0 self-center">
+                      {/* CAMBIO CLAVE: whitespace-normal y break-words permiten ver el nombre completo en varios renglones */}
+                      <h4 className="font-black text-slate-900 text-base uppercase tracking-tight leading-tight whitespace-normal break-words">
+                        {niño.hijo}
                       </h4>
                     </div>
                   </div>
 
-                  {/* ESTATUS CONVERTIDO EN BOTÓN DISCRETO */}
+                  {/* BOTÓN DE ESTATUS */}
                   <button
                     onClick={() => handleCambiarEstatus(niño)}
                     className={`w-full py-3 rounded-2xl text-[11px] font-black border uppercase tracking-[0.2em] mb-6 transition-all active:scale-95 shadow-lg ${getBadgeStyle(niño.estatus)}`}
@@ -174,28 +181,29 @@ const VistaBitacora = () => {
                   </button>
 
                   <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 ${niño.aseado ? 'border-blue-500 text-blue-600' : 'bg-rose-50 border-rose-500 text-rose-600 animate-pulse'}`}>
+                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.aseado ? 'border-blue-100 text-blue-400' : 'bg-rose-50 border-rose-500 text-rose-600 animate-pulse'}`}>
                       <CheckCircle size={18}/>
                       <span className="text-[9px] font-black uppercase">{niño.aseado ? 'Limpio' : 'Cambio'}</span>
                     </div>
 
-                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 ${niño.golpe ? 'bg-amber-50 border-amber-500 text-amber-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
+                    <div className={`py-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-colors ${niño.golpe ? 'bg-amber-50 border-amber-500 text-amber-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
                       <ShieldAlert size={18}/>
                       <span className="text-[9px] font-black uppercase">{niño.golpe ? 'Golpe' : 'Normal'}</span>
                     </div>
                   </div>
 
                   {niño.observaciones && (
-                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 italic text-xs text-slate-600 line-clamp-2">
+                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 italic text-xs text-slate-600 whitespace-normal break-words">
                       "{niño.observaciones}"
                     </div>
                   )}
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2">
+                {/* HORA DE LA ACTIVIDAD */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2 mt-auto">
                   <Clock size={14} className="text-violet-500"/>
                   <span className="text-xs font-bold text-slate-500">
-                    {niño.fecha_hora ? new Date(niño.fecha_hora).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                    {niño.fecha_hora || '--:--'}
                   </span>
                 </div>
 

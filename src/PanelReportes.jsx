@@ -58,30 +58,37 @@ const PanelReportes = () => {
   const nombreGuarderia = localStorage.getItem('nombre_guarderia') || 'BioSafe Kiosk';
 
   /**
-   * CORRECCIÓN DE FECHA: Evita el uso de UTC (Z) para que no 
-   * reste horas y cambie el día en el reporte.
+   * FORMATEO MANUAL: Recibe "YYYY-MM-DD HH:mm:ss" desde el backend
+   * y construye el string visual sin usar el objeto Date de JS
+   * para evitar saltos de zona horaria.
    */
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return "--:--";
     try {
+      // Separamos "2026-03-02" y "15:04:05"
       const [fechaPart, horaPart] = fechaStr.split(' ');
-      const [dia, mes, año] = fechaPart.split('/');
-      // Creamos la fecha como local (sin Z al final)
-      const fechaObj = new Date(`${año}-${mes}-${dia}T${horaPart}`);
-      
-      return fechaObj.toLocaleString('es-MX', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: true
-      });
-    } catch (e) { return fechaStr; }
+      const [año, mes, dia] = fechaPart.split('-');
+      const [hora, min] = horaPart.split(':');
+
+      // Convertir hora a formato 12h
+      const h = parseInt(hora);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const horaFormateada = `${String(h12).padStart(2, '0')}:${min} ${ampm}`;
+
+      return `${dia}/${mes}/${año} ${horaFormateada}`;
+    } catch (e) { 
+      return fechaStr; 
+    }
   };
 
+  /**
+   * Para el ordenamiento del lado del cliente
+   */
   const parseFechaBackend = (fechaStr) => {
     if (!fechaStr) return new Date(0);
-    const [fecha, hora] = fechaStr.split(' ');
-    const [dia, mes, año] = fecha.split('/');
-    // Se parsea como local para mantener consistencia en el ordenamiento
-    return new Date(`${año}-${mes}-${dia}T${hora}`);
+    // Reemplazamos espacio por T para hacerlo ISO compatible
+    return new Date(fechaStr.replace(' ', 'T'));
   };
 
   const obtenerReportes = async () => {
@@ -91,7 +98,10 @@ const PanelReportes = () => {
         params: { inicio: fechaInicio, fin: fechaFin }
       });
       let datos = Array.isArray(res.data) ? res.data : [];
-      datos.sort((a, b) => parseFechaBackend(a.fecha) - parseFechaBackend(b.fecha));
+      
+      // Ordenar por fecha más reciente
+      datos.sort((a, b) => parseFechaBackend(b.fecha) - parseFechaBackend(a.fecha));
+      
       setReportes(datos);
     } catch (error) {
       console.error("Error al obtener reportes", error);
@@ -117,7 +127,7 @@ const PanelReportes = () => {
           </div>
           <div className="text-right text-xs">
             <p className="font-bold">Periodo: {fechaInicio} al {fechaFin}</p>
-            <p className="text-slate-500">Generado: {new Date().toLocaleString()}</p>
+            <p className="text-slate-500">Generado: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
           </div>
         </div>
       </div>
@@ -137,13 +147,13 @@ const PanelReportes = () => {
           <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
         </div>
         <div className="flex items-end gap-2">
-          <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200">
+          <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
             <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
           <button 
             onClick={() => window.print()} 
             disabled={reportes.length === 0} 
-            className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"
+            className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50"
           >
             <Download size={18} /> IMPRIMIR
           </button>
@@ -165,50 +175,61 @@ const PanelReportes = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {reportes.map((reg, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="p-4 text-xs font-bold text-slate-500 text-center">{formatearFechaLocal(reg.fecha)}</td>
-                  <td className="p-4 text-sm font-black text-slate-900 uppercase text-left-print">{reg.hijo_nombre}</td>
-                  <td className="p-4 text-xs font-bold text-violet-600 text-left-print">{reg.tutor_nombre}</td>
-                  <td className="p-4 text-center">
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${reg.tipo === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                      {reg.tipo}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex justify-center items-center gap-2">
-                      {/* ASEADO: Verde si es true, Oscuro si es false */}
-                      <div className="flex flex-col items-center">
-                        <CheckCircle 
-                          size={18} 
-                          className={reg.aseado ? 'text-emerald-500' : 'text-slate-900'} 
-                        />
-                        <span className={`text-[7px] font-black uppercase ${reg.aseado ? 'text-emerald-600' : 'text-slate-900'}`}>
-                          {reg.aseado ? 'Aseado' : 'No Aseado'}
-                        </span>
-                      </div>
-
-                      {/* GOLPE: Solo se muestra si es true */}
-                      {reg.reporte_golpe && (
-                        <div className="flex flex-col items-center">
-                          <ShieldAlert size={18} className="text-red-500 animate-pulse" />
-                          <span className="text-[7px] font-black uppercase text-red-600">Golpe</span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 text-[10px] italic text-slate-600 text-left-print">{reg.observaciones || "-"}</td>
+              {reportes.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No hay registros para este periodo.</td>
                 </tr>
-              ))}
+              ) : (
+                reportes.map((reg, i) => (
+                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 text-xs font-bold text-slate-500 text-center">
+                      {formatearFechaLocal(reg.fecha)}
+                    </td>
+                    <td className="p-4 text-sm font-black text-slate-900 uppercase text-left-print">
+                      {reg.hijo_nombre}
+                    </td>
+                    <td className="p-4 text-xs font-bold text-violet-600 text-left-print">
+                      {reg.tutor_nombre}
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${reg.tipo === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                        {reg.tipo}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex justify-center items-center gap-2">
+                        <div className="flex flex-col items-center">
+                          <CheckCircle 
+                            size={18} 
+                            className={reg.aseado ? 'text-emerald-500' : 'text-slate-300'} 
+                          />
+                          <span className={`text-[7px] font-black uppercase ${reg.aseado ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {reg.aseado ? 'Aseado' : 'No Aseado'}
+                          </span>
+                        </div>
+                        {reg.reporte_golpe && (
+                          <div className="flex flex-col items-center">
+                            <ShieldAlert size={18} className="text-red-500 animate-pulse" />
+                            <span className="text-[7px] font-black uppercase text-red-600">Golpe</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-[10px] italic text-slate-600 text-left-print">
+                      {reg.observaciones || "-"}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
       
-      {/* PIE DE PÁGINA CENTRADO */}
+      {/* PIE DE PÁGINA (Solo impresión) */}
       <div className="hidden print:flex justify-center gap-20 mt-16 pb-10">
-        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold">FIRMA DE DIRECCIÓN</div>
-        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold">SELLO INSTITUCIONAL</div>
+        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold uppercase">Firma de Dirección</div>
+        <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold uppercase">Sello Institucional</div>
       </div>
     </div>
   );
