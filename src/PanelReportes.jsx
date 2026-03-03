@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from './axiosConfig'; 
 import { 
   Download, RefreshCw, Calendar as CalendarIcon, 
-  CheckCircle, ShieldAlert, ChevronUp, ChevronDown 
+  CheckCircle, ShieldAlert, ChevronUp, ChevronDown, User, Search
 } from 'lucide-react';
 
 const stylePrint = `
@@ -23,12 +23,17 @@ const PanelReportes = () => {
   const [loading, setLoading] = useState(false);
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
   const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]);
+  const [busquedaNombre, setBusquedaNombre] = useState(""); // Estado para el texto escrito
   
-  // ESTADO PARA EL ORDENAMIENTO
-  // 'fecha' es la clave del backend, 'hijo_nombre' es la clave para el nombre
   const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
 
   const nombreGuarderia = localStorage.getItem('guarderia_nombre') || 'BioSafe Kiosk';
+
+  // Extraer nombres únicos para las sugerencias del buscador
+  const sugerenciasNombres = React.useMemo(() => {
+    const nombres = reportes.map(r => r.hijo_nombre);
+    return [...new Set(nombres)].sort();
+  }, [reportes]);
 
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return "--:--";
@@ -57,7 +62,6 @@ const PanelReportes = () => {
     }
   };
 
-  // LÓGICA DE ORDENAMIENTO
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -66,37 +70,39 @@ const PanelReportes = () => {
     setSortConfig({ key, direction });
   };
 
-  const reportesOrdenados = React.useMemo(() => {
-    let sortableItems = [...reportes];
+  // Lógica de filtrado por búsqueda de texto y ordenamiento
+  const reportesProcesados = React.useMemo(() => {
+    // 1. Filtrar por lo que el usuario escribe (ignora mayúsculas/minúsculas)
+    let items = reportes.filter(reg => 
+      reg.hijo_nombre.toLowerCase().includes(busquedaNombre.toLowerCase())
+    );
+
+    // 2. Ordenar
     if (sortConfig.key !== null) {
-      sortableItems.sort((a, b) => {
+      items.sort((a, b) => {
         let valA = a[sortConfig.key] || "";
         let valB = b[sortConfig.key] || "";
 
-        // CASO ESPECIAL: ORDENAR POR FECHA (Timestamp)
         if (sortConfig.key === 'fecha') {
           const dateA = new Date(valA.replace(' ', 'T')).getTime();
           const dateB = new Date(valB.replace(' ', 'T')).getTime();
           return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
         }
 
-        // CASO GENERAL: ORDENAR ALFABÉTICAMENTE (Nombres, etc.)
         const stringA = valA.toString().toLowerCase();
         const stringB = valB.toString().toLowerCase();
-
         if (stringA < stringB) return sortConfig.direction === 'asc' ? -1 : 1;
         if (stringA > stringB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
-    return sortableItems;
-  }, [reportes, sortConfig]);
+    return items;
+  }, [reportes, sortConfig, busquedaNombre]);
 
   useEffect(() => {
     obtenerReportes();
   }, [fechaInicio, fechaFin]);
 
-  // Icono dinámico según el estado de orden
   const SortIcon = ({ column }) => {
     if (sortConfig.key !== column) return <div className="w-4" />;
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-violet-600" /> : <ChevronDown size={14} className="text-violet-600" />;
@@ -111,7 +117,9 @@ const PanelReportes = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-black uppercase text-slate-900">{nombreGuarderia}</h1>
-            <h2 className="text-lg font-bold uppercase text-violet-600">Reporte de Asistencia</h2>
+            <h2 className="text-lg font-bold uppercase text-violet-600">
+              Reporte de Asistencia {busquedaNombre && ` - Búsqueda: ${busquedaNombre.toUpperCase()}`}
+            </h2>
           </div>
           <div className="text-right text-xs">
             <p className="font-bold">Periodo: {fechaInicio} al {fechaFin}</p>
@@ -121,30 +129,53 @@ const PanelReportes = () => {
       </div>
 
       {/* FILTROS (no-print) */}
-      <div className="no-print grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-lg mb-8">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
-            <CalendarIcon size={12} /> Fecha Inicial
-          </label>
-          <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
-            <CalendarIcon size={12} /> Fecha Final
-          </label>
-          <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
-        </div>
-        <div className="flex items-end gap-2">
-          <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
-            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-          </button>
-          <button 
-            onClick={() => window.print()} 
-            disabled={reportes.length === 0} 
-            className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50"
-          >
-            <Download size={18} /> IMPRIMIR
-          </button>
+      <div className="no-print space-y-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-lg">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
+              <CalendarIcon size={12} /> Fecha Inicial
+            </label>
+            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
+              <CalendarIcon size={12} /> Fecha Final
+            </label>
+            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
+          </div>
+          
+          {/* BUSCADOR CON AUTO-COMPLETADO */}
+          <div className="space-y-1 relative">
+            <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
+              <Search size={12} /> Buscar Alumno
+            </label>
+            <input 
+              list="nombres-alumnos"
+              type="text"
+              value={busquedaNombre}
+              onChange={(e) => setBusquedaNombre(e.target.value)}
+              placeholder="Escribe el nombre..."
+              className="w-full bg-slate-50 border p-3 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-violet-500 uppercase placeholder:normal-case"
+            />
+            <datalist id="nombres-alumnos">
+              {sugerenciasNombres.map(nombre => (
+                <option key={nombre} value={nombre} />
+              ))}
+            </datalist>
+          </div>
+
+          <div className="flex items-end gap-2">
+            <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+            </button>
+            <button 
+              onClick={() => window.print()} 
+              disabled={reportesProcesados.length === 0} 
+              className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Download size={18} /> IMPRIMIR
+            </button>
+          </div>
         </div>
       </div>
 
@@ -173,12 +204,12 @@ const PanelReportes = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {reportesOrdenados.length === 0 ? (
+              {reportesProcesados.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No hay registros para este periodo.</td>
+                  <td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No se encontraron registros que coincidan con la búsqueda.</td>
                 </tr>
               ) : (
-                reportesOrdenados.map((reg, i) => (
+                reportesProcesados.map((reg, i) => (
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 text-xs font-bold text-slate-500 text-center">
                       {formatearFechaLocal(reg.fecha)}
@@ -221,7 +252,6 @@ const PanelReportes = () => {
         </div>
       </div>
       
-      {/* PIE DE PÁGINA IMPRESIÓN */}
       <div className="hidden print:flex justify-center gap-20 mt-16 pb-10">
         <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold uppercase">Firma de Dirección</div>
         <div className="text-center border-t-2 border-black w-56 pt-2 text-[10px] font-bold uppercase">Sello Institucional</div>
