@@ -10,13 +10,22 @@ import withReactContent from 'sweetalert2-react-content';
 const MySwal = withReactContent(Swal);
 
 const VistaBitacora = () => {
+  // --- FUNCIÓN PARA OBTENER FECHA LOCAL DE CULIACÁN ---
+  const getFechaLocalCuliacan = () => {
+    const fecha = new Date();
+    const offset = fecha.getTimezoneOffset() * 60000;
+    return new Date(fecha - offset).toISOString().split('T')[0];
+  };
+
   const [niños, setNiños] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fechaFiltro, setFechaFiltro] = useState(new Date().toISOString().split('T')[0]);
+  const [fechaFiltro, setFechaFiltro] = useState(getFechaLocalCuliacan());
   const [busqueda, setBusqueda] = useState("");
 
   const fetchEstatus = async () => {
     setLoading(true);
+    // Limpiamos la lista al cambiar de fecha para evitar confusión visual
+    setNiños([]); 
     try {
       const res = await api.get('/bitacora', {
         params: { fecha: fechaFiltro }
@@ -32,6 +41,22 @@ const VistaBitacora = () => {
   useEffect(() => {
     fetchEstatus();
   }, [fechaFiltro]);
+
+  // Formatea la hora de la actividad (HH:mm AM/PM)
+  const formatearHora = (fechaStr) => {
+    if (!fechaStr || fechaStr === '--:--') return '--:--';
+    try {
+      const isoStr = fechaStr.includes(' ') ? fechaStr.replace(' ', 'T') : fechaStr;
+      const date = new Date(isoStr);
+      if (isNaN(date.getTime())) return fechaStr;
+
+      return date.toLocaleTimeString('es-MX', {
+        hour: '2d-digit',
+        minute: '2d-digit',
+        hour12: true
+      });
+    } catch (e) { return fechaStr; }
+  };
 
   const handleCambiarEstatus = async (niño) => {
     let nuevoEstatus = "";
@@ -115,6 +140,7 @@ const VistaBitacora = () => {
           <div className="flex flex-col gap-1">
             <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Bitácora</h3>
             <div className="h-1 w-20 bg-violet-600 rounded-full"></div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Zona Horaria: Culiacán, MX</p>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
@@ -153,7 +179,7 @@ const VistaBitacora = () => {
             </div>
           ) : filtrados.length === 0 ? (
             <div className="col-span-full py-20 text-center text-slate-400 font-medium">
-              No se encontraron alumnos para esta fecha o búsqueda.
+              No se encontraron alumnos para el día {fechaFiltro.split('-').reverse().join('/')}.
             </div>
           ) : (
             filtrados.map(niño => (
@@ -165,19 +191,17 @@ const VistaBitacora = () => {
                       <User size={24} />
                     </div>
                     <div className="flex-1 min-w-0 self-center">
-                      {/* CAMBIO CLAVE: whitespace-normal y break-words permiten ver el nombre completo en varios renglones */}
                       <h4 className="font-black text-slate-900 text-base uppercase tracking-tight leading-tight whitespace-normal break-words">
                         {niño.hijo}
                       </h4>
                     </div>
                   </div>
 
-                  {/* BOTÓN DE ESTATUS */}
                   <button
                     onClick={() => handleCambiarEstatus(niño)}
                     className={`w-full py-3 rounded-2xl text-[11px] font-black border uppercase tracking-[0.2em] mb-6 transition-all active:scale-95 shadow-lg ${getBadgeStyle(niño.estatus)}`}
                   >
-                    {niño.estatus === 'AUSENTE' ? '🏠 En Casa' : niño.estatus}
+                    {(!niño.estatus || niño.estatus === 'AUSENTE') ? '🏠 En Casa' : niño.estatus}
                   </button>
 
                   <div className="grid grid-cols-2 gap-3 mb-6">
@@ -199,11 +223,10 @@ const VistaBitacora = () => {
                   )}
                 </div>
 
-                {/* HORA DE LA ACTIVIDAD */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-2 mt-auto">
                   <Clock size={14} className="text-violet-500"/>
                   <span className="text-xs font-bold text-slate-500">
-                    {niño.fecha_hora || '--:--'}
+                    {formatearHora(niño.fecha_hora)}
                   </span>
                 </div>
 

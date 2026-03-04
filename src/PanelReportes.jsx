@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from './axiosConfig'; 
 import { 
   Download, RefreshCw, Calendar as CalendarIcon, 
-  CheckCircle, ShieldAlert, ChevronUp, ChevronDown, User, Search
+  CheckCircle, ShieldAlert, ChevronUp, ChevronDown, Search
 } from 'lucide-react';
 
 const stylePrint = `
@@ -19,17 +19,23 @@ const stylePrint = `
 `;
 
 const PanelReportes = () => {
+  // --- CORRECCIÓN DE ZONA HORARIA PARA CULIACÁN ---
+  const getFechaLocalCuliacan = () => {
+    const fecha = new Date();
+    const offset = fecha.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(fecha - offset).toISOString().split('T')[0];
+    return localISOTime;
+  };
+
   const [reportes, setReportes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]);
-  const [busquedaNombre, setBusquedaNombre] = useState(""); // Estado para el texto escrito
-  
+  const [fechaInicio, setFechaInicio] = useState(getFechaLocalCuliacan());
+  const [fechaFin, setFechaFin] = useState(getFechaLocalCuliacan());
+  const [busquedaNombre, setBusquedaNombre] = useState(""); 
   const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
 
   const nombreGuarderia = localStorage.getItem('guarderia_nombre') || 'BioSafe Kiosk';
 
-  // Extraer nombres únicos para las sugerencias del buscador
   const sugerenciasNombres = React.useMemo(() => {
     const nombres = reportes.map(r => r.hijo_nombre);
     return [...new Set(nombres)].sort();
@@ -38,13 +44,18 @@ const PanelReportes = () => {
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return "--:--";
     try {
-      const [fechaPart, horaPart] = fechaStr.split(' ');
-      const [año, mes, dia] = fechaPart.split('-');
-      const [hora, min] = horaPart.split(':');
-      const h = parseInt(hora);
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      const h12 = h % 12 || 12;
-      return `${dia}/${mes}/${año} ${String(h12).padStart(2, '0')}:${min} ${ampm}`;
+      const isoStr = fechaStr.includes(' ') ? fechaStr.replace(' ', 'T') : fechaStr;
+      const date = new Date(isoStr);
+      if (isNaN(date.getTime())) return fechaStr;
+
+      return date.toLocaleString('es-MX', {
+        day: '2d-digit',
+        month: '2d-digit',
+        year: 'numeric',
+        hour: '2d-digit',
+        minute: '2d-digit',
+        hour12: true
+      });
     } catch (e) { return fechaStr; }
   };
 
@@ -70,14 +81,11 @@ const PanelReportes = () => {
     setSortConfig({ key, direction });
   };
 
-  // Lógica de filtrado por búsqueda de texto y ordenamiento
   const reportesProcesados = React.useMemo(() => {
-    // 1. Filtrar por lo que el usuario escribe (ignora mayúsculas/minúsculas)
     let items = reportes.filter(reg => 
       reg.hijo_nombre.toLowerCase().includes(busquedaNombre.toLowerCase())
     );
 
-    // 2. Ordenar
     if (sortConfig.key !== null) {
       items.sort((a, b) => {
         let valA = a[sortConfig.key] || "";
@@ -118,7 +126,7 @@ const PanelReportes = () => {
           <div>
             <h1 className="text-2xl font-black uppercase text-slate-900">{nombreGuarderia}</h1>
             <h2 className="text-lg font-bold uppercase text-violet-600">
-              Reporte de Asistencia {busquedaNombre && ` - Búsqueda: ${busquedaNombre.toUpperCase()}`}
+              Reporte de Asistencia {busquedaNombre && ` - Alumno: ${busquedaNombre.toUpperCase()}`}
             </h2>
           </div>
           <div className="text-right text-xs">
@@ -144,7 +152,6 @@ const PanelReportes = () => {
             <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
           </div>
           
-          {/* BUSCADOR CON AUTO-COMPLETADO */}
           <div className="space-y-1 relative">
             <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
               <Search size={12} /> Buscar Alumno
@@ -185,16 +192,10 @@ const PanelReportes = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b">
-                <th 
-                  onClick={() => handleSort('fecha')}
-                  className="p-4 text-[10px] font-black text-slate-500 uppercase w-[15%] text-center cursor-pointer hover:bg-violet-50 transition-colors"
-                >
+                <th onClick={() => handleSort('fecha')} className="p-4 text-[10px] font-black text-slate-500 uppercase w-[15%] text-center cursor-pointer hover:bg-violet-50 transition-colors">
                   <div className="flex items-center justify-center gap-1">Fecha/Hora <SortIcon column="fecha" /></div>
                 </th>
-                <th 
-                  onClick={() => handleSort('hijo_nombre')}
-                  className="p-4 text-[10px] font-black text-slate-500 uppercase w-[20%] text-center cursor-pointer hover:bg-violet-50 transition-colors"
-                >
+                <th onClick={() => handleSort('hijo_nombre')} className="p-4 text-[10px] font-black text-slate-500 uppercase w-[20%] text-center cursor-pointer hover:bg-violet-50 transition-colors">
                   <div className="flex items-center justify-center gap-1">Alumno <SortIcon column="hijo_nombre" /></div>
                 </th>
                 <th className="p-4 text-[10px] font-black text-slate-500 uppercase w-[20%] text-center">Responsable</th>
@@ -206,7 +207,7 @@ const PanelReportes = () => {
             <tbody className="divide-y divide-slate-100">
               {reportesProcesados.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No se encontraron registros que coincidan con la búsqueda.</td>
+                  <td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No se encontraron registros.</td>
                 </tr>
               ) : (
                 reportesProcesados.map((reg, i) => (
@@ -227,12 +228,17 @@ const PanelReportes = () => {
                     </td>
                     <td className="p-4">
                       <div className="flex justify-center items-center gap-2">
-                        <div className="flex flex-col items-center">
-                          <CheckCircle size={18} className={reg.aseado ? 'text-emerald-500' : 'text-slate-300'} />
-                          <span className={`text-[7px] font-black uppercase ${reg.aseado ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {reg.aseado ? 'Aseado' : 'No Aseado'}
-                          </span>
-                        </div>
+                        {/* CONDICIONAL: Solo mostrar Aseado/No Aseado si es ENTRADA */}
+                        {reg.tipo === 'ENTRADA' && (
+                          <div className="flex flex-col items-center">
+                            <CheckCircle size={18} className={reg.aseado ? 'text-emerald-500' : 'text-slate-300'} />
+                            <span className={`text-[7px] font-black uppercase ${reg.aseado ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {reg.aseado ? 'Aseado' : 'No Aseado'}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* El icono de golpe se mantiene para ambos por seguridad */}
                         {reg.reporte_golpe && (
                           <div className="flex flex-col items-center">
                             <ShieldAlert size={18} className="text-red-500 animate-pulse" />
