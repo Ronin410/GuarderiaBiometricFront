@@ -24,12 +24,11 @@ const stylePrint = `
       border-radius: 0 !important; 
       box-shadow: none !important; 
       width: 100% !important; 
-      display: table; /* Cambiar de block a table para mejor soporte de saltos */
+      display: table; 
     }
 
     table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
     
-    /* Evita que una fila se parta a la mitad entre dos páginas */
     tr { page-break-inside: avoid; page-break-after: auto; }
     
     th, td { 
@@ -40,14 +39,32 @@ const stylePrint = `
       word-wrap: break-word !important; 
     }
 
-    /* CONTENEDOR DE FIRMAS: Evita que aparezca solo en una hoja */
+    /* CONTENEDOR DE FIRMAS: Área ampliada y profesional */
     .footer-signatures {
-      margin-top: 30px;
+      margin-top: 50px; 
       display: flex;
-      justify-content: center;
-      gap: 100px;
-      page-break-inside: avoid; /* Bloquea el salto dentro de las firmas */
-      page-break-before: auto;  /* Permite saltar antes si es necesario, pero intentará estar con la tabla */
+      justify-content: space-around; 
+      align-items: flex-end; 
+      page-break-inside: avoid;
+      width: 100%;
+    }
+
+    .signature-box {
+      text-align: center;
+      width: 300px; 
+      height: 130px; /* Espacio amplio para firma/sello manual */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .signature-line {
+      border-top: 2px solid black;
+      padding-top: 8px;
+      font-size: 11px !important;
+      font-weight: bold !important;
+      text-transform: uppercase;
+      color: black !important;
     }
 
     .text-left-print { text-align: left !important; }
@@ -55,6 +72,7 @@ const stylePrint = `
 `;
 
 const PanelReportes = () => {
+  // --- ZONA HORARIA CULIACÁN ---
   const getFechaLocalCuliacan = () => {
     const fecha = new Date();
     const offset = fecha.getTimezoneOffset() * 60000;
@@ -140,29 +158,36 @@ const PanelReportes = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-lg">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2"><CalendarIcon size={12} /> Fecha Inicial</label>
-            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
+            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold text-slate-700" />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2"><CalendarIcon size={12} /> Fecha Final</label>
-            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold" />
+            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border p-3 rounded-xl font-bold text-slate-700" />
           </div>
           <div className="space-y-1 relative">
             <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2"><Search size={12} /> Buscar Alumno</label>
-            <input list="nombres-alumnos" type="text" value={busquedaNombre} onChange={(e) => setBusquedaNombre(e.target.value)} placeholder="Nombre..." className="w-full bg-slate-50 border p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-violet-500 uppercase" />
+            <input list="nombres-alumnos" type="text" value={busquedaNombre} onChange={(e) => setBusquedaNombre(e.target.value)} placeholder="Escribe el nombre..." className="w-full bg-slate-50 border p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-violet-500 uppercase placeholder:normal-case" />
             <datalist id="nombres-alumnos">
               {sugerenciasNombres.map(n => <option key={n} value={n} />)}
             </datalist>
           </div>
           <div className="flex items-end gap-2">
-            <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200"><RefreshCw size={20} className={loading ? "animate-spin" : ""} /></button>
-            <button onClick={() => window.print()} disabled={reportesProcesados.length === 0} className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md disabled:opacity-50"><Download size={18} /> IMPRIMIR</button>
+            <button onClick={obtenerReportes} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+            </button>
+            <button 
+              onClick={() => window.print()} 
+              disabled={reportesProcesados.length === 0} 
+              className="flex-1 bg-violet-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Download size={18} /> IMPRIMIR
+            </button>
           </div>
         </div>
       </div>
 
-      {/* CONTENEDOR QUE AGRUPA TABLA Y FIRMAS */}
+      {/* CONTENEDOR PARA IMPRESIÓN */}
       <div className="report-wrapper">
-        {/* ENCABEZADO PARA IMPRESIÓN */}
         <div className="hidden print:block border-b-4 border-slate-900 pb-4 mb-6">
           <div className="flex justify-between items-center">
             <div>
@@ -171,12 +196,11 @@ const PanelReportes = () => {
             </div>
             <div className="text-right text-xs">
               <p className="font-bold">Periodo: {fechaInicio} al {fechaFin}</p>
-              <p>Generado: {new Date().toLocaleDateString()}</p>
+              <p className="text-slate-500">Generado: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
         </div>
 
-        {/* TABLA */}
         <div className="table-wrapper bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-xl">
           <table className="w-full">
             <thead>
@@ -190,33 +214,45 @@ const PanelReportes = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {reportesProcesados.map((reg, i) => (
-                <tr key={i}>
-                  <td className="p-4 text-xs font-bold text-slate-500">{formatearFechaLocal(reg.fecha)}</td>
-                  <td className="p-4 text-sm font-black uppercase text-left-print">{reg.hijo_nombre}</td>
-                  <td className="p-4 text-xs font-bold text-violet-600 text-left-print">{reg.tutor_nombre}</td>
-                  <td className="p-4 text-center">
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${reg.tipo === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
-                      {reg.tipo}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex justify-center gap-2">
-                      {reg.tipo === 'ENTRADA' && <CheckCircle size={16} className={reg.aseado ? 'text-emerald-500' : 'text-slate-200'} />}
-                      {reg.reporte_golpe && <ShieldAlert size={16} className="text-red-500" />}
-                    </div>
-                  </td>
-                  <td className="p-4 text-[10px] italic text-left-print">{reg.observaciones || "-"}</td>
-                </tr>
-              ))}
+              {reportesProcesados.length === 0 ? (
+                <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-medium">No se encontraron registros.</td></tr>
+              ) : (
+                reportesProcesados.map((reg, i) => (
+                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 text-xs font-bold text-slate-500">{formatearFechaLocal(reg.fecha)}</td>
+                    <td className="p-4 text-sm font-black uppercase text-left-print text-slate-900">{reg.hijo_nombre}</td>
+                    <td className="p-4 text-xs font-bold text-violet-600 text-left-print">{reg.tutor_nombre}</td>
+                    <td className="p-4 text-center">
+                      <span className={`text-[9px] font-black px-2 py-1 rounded-lg border ${reg.tipo === 'ENTRADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                        {reg.tipo}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex justify-center items-center gap-2">
+                        {reg.tipo === 'ENTRADA' && <CheckCircle size={16} className={reg.aseado ? 'text-emerald-500' : 'text-slate-200'} />}
+                        {reg.reporte_golpe && <ShieldAlert size={16} className="text-red-500" />}
+                      </div>
+                    </td>
+                    <td className="p-4 text-[10px] italic text-slate-600 text-left-print">{reg.observaciones || "-"}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* PIE DE FIRMAS: Envuelto en footer-signatures con page-break-inside: avoid */}
+        {/* PIE DE FIRMAS CON ESPACIOS AMPLIADOS */}
         <div className="hidden print:flex footer-signatures">
-          <div className="text-center border-t-2 border-black w-64 pt-2 text-[10px] font-bold uppercase">Firma de Dirección</div>
-          <div className="text-center border-t-2 border-black w-64 pt-2 text-[10px] font-bold uppercase">Sello Institucional</div>
+          <div className="signature-box">
+            <div className="signature-line">
+              Firma de Dirección y/o Responsable
+            </div>
+          </div>
+          <div className="signature-box">
+            <div className="signature-line">
+              Sello Institucional de la Guardería
+            </div>
+          </div>
         </div>
       </div>
     </div>
