@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/logo192.png" />
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
@@ -11,15 +11,12 @@
     <meta name="theme-color" content="#7c3aed" /> 
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Guardería" />
     
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.json" />
     
     <link rel="apple-touch-icon" href="/logo192.png" />
 
     <style>
-      /* Previene el rebote elástico en iOS y asegura el llenado de pantalla */
       html, body {
         height: 100%;
         margin: 0;
@@ -28,13 +25,8 @@
         overscroll-behavior-y: contain;
         font-family: system-ui, -apple-system, sans-serif;
       }
-
-      #root {
-        height: 100%;
-      }
-
+      #root { height: 100%; }
       :root {
-        /* Variables para manejar el notch de los celulares modernos */
         --safe-top: env(safe-area-inset-top);
         --safe-bottom: env(safe-area-inset-bottom);
       }
@@ -42,6 +34,17 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registrado', reg))
+            .catch(err => console.error('Error al registrar SW', err));
+        });
+      }
+    </script>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
