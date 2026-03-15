@@ -4,12 +4,15 @@ import api from './axiosConfig';
 import { 
   UserPlus, ScanEye, Baby, AlertCircle, Users, Search, 
   ClipboardList, TrendingUp, ShieldCheck, ArrowRightCircle, 
-  Lock, LogOut, CheckCircle, KeyRound, RefreshCw, X, Send, Clock, LogOut as LogOutIcon
+  Lock, LogOut, CheckCircle, KeyRound, RefreshCw, X, Send, Clock, LogOut as LogOutIcon,
+  User
 } from 'lucide-react';
 
+// Componentes secundarios
 import GestionHijos from './GestionHijos';
 import VistaBitacora from './VistaBitacora';
 import PanelReportes from './PanelReportes';
+import DashboardPadre from './DashboardPadre'; // <-- Asegúrate de crear este archivo
 
 const videoConstraints = {
   width: { ideal: 720 },
@@ -19,69 +22,80 @@ const videoConstraints = {
 };
 
 function App() {
+  // --- ESTADOS DE AUTENTICACIÓN Y SESIÓN ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null); // ID específico del papá
   const [guarderiaInfo, setGuarderiaInfo] = useState({ nombre: '', slug: '' });
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [tipoAcceso, setTipoAcceso] = useState('staff'); // 'staff' o 'papa'
   
+  // --- ESTADOS DE NAVEGACIÓN Y UI ---
   const [tab, setTab] = useState('identificar');
-  const [nombre, setNombre] = useState('');
-  const [resultado, setResultado] = useState(null);
   const [loading, setLoading] = useState(false);
-  const webcamRef = useRef(null);
-
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [tabPendiente, setTabPendiente] = useState(null);
 
+  // --- ESTADOS DE RECONOCIMIENTO FACIAL ---
+  const webcamRef = useRef(null);
+  const [nombre, setNombre] = useState(''); 
+  const [resultado, setResultado] = useState(null);
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [formAsistencia, setFormAsistencia] = useState({});
+
+  // --- ESTADOS DE GESTIÓN DE PADRES/HIJOS ---
   const [padreSeleccionado, setPadreSeleccionado] = useState(null);
   const [tutoresEncontrados, setTutoresEncontrados] = useState([]);
   const [mostrarModalGestion, setMostrarModalGestion] = useState(false);
 
-  const [formAsistencia, setFormAsistencia] = useState({});
-  const [seleccionados, setSeleccionados] = useState([]);
-
-  const cargarTodosLosPadres = async (query = '') => {
-    try {
-      const res = await api.get(`/buscar-padres?q=${query}`);
-      setTutoresEncontrados(res.data || []);
-    } catch (err) { 
-      console.error("Error cargando padres:", err); 
-    }
-  };
-
-  useEffect(() => {
-    if (tab === 'admin' && isLoggedIn) cargarTodosLosPadres();
-  }, [tab, isLoggedIn]);
-
+  // Persistencia de sesión
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       setIsLoggedIn(true);
       setUserRole(localStorage.getItem('role'));
+      setUserId(localStorage.getItem('userId'));
       setGuarderiaInfo({ 
-        nombre: localStorage.getItem('guarderia_nombre'), 
-        slug: localStorage.getItem('guarderia_slug') 
+        nombre: localStorage.getItem('guarderia_nombre') || '', 
+        slug: localStorage.getItem('guarderia_slug') || '' 
       });
     }
   }, []);
 
+  useEffect(() => {
+    if (tab === 'admin' && isLoggedIn) cargarTodosLosPadres();
+  }, [tab, isLoggedIn]);
+
+  // --- FUNCIONES DE ACCESO ---
   const manejarLoginPrincipal = async (e) => {
     if (e) e.preventDefault();
     try {
-      const res = await api.post('/login', { username: loginUsername, password: loginPassword });
+      // Enviamos el tipo para que el backend busque en la tabla correcta
+      const res = await api.post('/login', { 
+        username: loginUsername, 
+        password: loginPassword,
+        tipo: tipoAcceso 
+      });
+
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('role', res.data.rol);
-        localStorage.setItem('guarderia_nombre', res.data.guarderia_nombre);
-        localStorage.setItem('guarderia_slug', res.data.guarderia_slug);
+        localStorage.setItem('userId', res.data.userId);
+        localStorage.setItem('guarderia_nombre', res.data.guarderia_nombre || '');
+        localStorage.setItem('guarderia_slug', res.data.guarderia_slug || '');
+        
         setIsLoggedIn(true);
         setUserRole(res.data.rol);
-        setGuarderiaInfo({ nombre: res.data.guarderia_nombre, slug: res.data.guarderia_slug });
+        setUserId(res.data.userId);
+        setGuarderiaInfo({ 
+          nombre: res.data.guarderia_nombre || '', 
+          slug: res.data.guarderia_slug || '' 
+        });
       }
     } catch (error) { 
-      alert("Credenciales incorrectas"); 
+      alert("Credenciales incorrectas para el perfil seleccionado"); 
     }
   };
 
@@ -94,17 +108,20 @@ function App() {
 
   const cambiarTab = (targetTab) => {
     const tabsProtegidas = ['admin', 'bitacora', 'reportes'];
-    // Si el usuario ya es admin, entra directo. Si no, pide PIN.
     if (tabsProtegidas.includes(targetTab) && userRole !== 'admin') {
       setTabPendiente(targetTab);
       setShowAdminPinModal(true);
     } else {
       setTab(targetTab);
-      setResultado(null);
-      setNombre('');
-      setSeleccionados([]);
-      setFormAsistencia({});
+      resetearProcesoEscaneo();
     }
+  };
+
+  const resetearProcesoEscaneo = () => {
+    setResultado(null);
+    setNombre('');
+    setSeleccionados([]);
+    setFormAsistencia({});
   };
 
   const verificarPinAdmin = async () => {
@@ -121,19 +138,16 @@ function App() {
     }
   };
 
+  // --- RECONOCIMIENTO Y ASISTENCIA (Lógica Original) ---
   const procesarRostro = async (endpoint) => {
     if (endpoint === 'registrar' && !nombre.trim()) {
       alert("⚠️ Error: No has escrito un nombre para el registro.");
       return;
     }
-
     if (!webcamRef.current) return;
     const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) {
-      alert("No se pudo capturar la imagen de la cámara.");
-      return;
-    }
-    
+    if (!imageSrc) return alert("No se pudo capturar la imagen.");
+
     setLoading(true);
     const base64Image = imageSrc.split(',')[1];
     try {
@@ -151,17 +165,13 @@ function App() {
           nombre: endpoint === 'registrar' ? nombre : (response.data.nombre || response.data.padre) 
         } 
       });
-      
-      setSeleccionados([]);
-      setFormAsistencia({});
 
       if (endpoint === 'registrar') {
         setPadreSeleccionado({ id: response.data.padre_id, nombre });
         setMostrarModalGestion(true);
-        setNombre('');
       }
     } catch (error) { 
-      setResultado({ type: 'error', msg: error.response?.data?.error || 'No reconocido' }); 
+      setResultado({ type: 'error', msg: error.response?.data?.error || 'Rostro no reconocido' }); 
     } finally { 
       setLoading(false); 
     }
@@ -174,7 +184,7 @@ function App() {
 
     if (!seleccionados.includes(hID)) {
       if (estado === "ENTRADA") {
-        const confirmar = window.confirm(`El niño ${hijo.nombre_niño || hijo.nombre} ya está en la guardería. ¿Deseas registrar su SALIDA?`);
+        const confirmar = window.confirm(`¿Deseas registrar la SALIDA de ${hijo.nombre_niño || hijo.nombre}?`);
         if (!confirmar) return;
       }
       setSeleccionados([...seleccionados, hID]);
@@ -184,7 +194,7 @@ function App() {
   };
 
   const registrarMultiplesAsistencias = async () => {
-    if (seleccionados.length === 0) return alert("Selecciona al menos un niño");
+    if (seleccionados.length === 0) return;
     setLoading(true);
     try {
       const promesas = seleccionados.map(hijoId => {
@@ -201,16 +211,25 @@ function App() {
         });
       });
       await Promise.all(promesas);
-      alert("Movimientos registrados con éxito");
-      setResultado(null);
-      setSeleccionados([]);
+      alert("Operación exitosa");
+      resetearProcesoEscaneo();
     } catch (error) { 
-      alert("Error al procesar registros"); 
+      alert("Error al registrar"); 
     } finally { 
       setLoading(false); 
     }
   };
 
+  const cargarTodosLosPadres = async (query = '') => {
+    try {
+      const res = await api.get(`/buscar-padres?q=${query}`);
+      setTutoresEncontrados(res.data || []);
+    } catch (err) { console.error(err); }
+  };
+
+  // --- RENDERIZADO CONDICIONAL ---
+
+  // 1. SI NO ESTÁ LOGUEADO: MOSTRAR LOGIN CON SELECTOR DE ROL
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -219,17 +238,41 @@ function App() {
             <ShieldCheck size={40} className="text-white" />
           </div>
           <h1 className="text-3xl font-black text-slate-900 uppercase mb-2">BioSafe</h1>
-          <p className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-8">Acceso Seguro</p>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mb-6">Selecciona tu perfil</p>
+          
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8 border border-slate-200">
+            <button 
+              onClick={() => setTipoAcceso('staff')}
+              className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase transition-all ${tipoAcceso === 'staff' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              <Users size={14}/> Staff / Admin
+            </button>
+            <button 
+              onClick={() => setTipoAcceso('papa')}
+              className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase transition-all ${tipoAcceso === 'papa' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              <Baby size={14}/> Soy Papá
+            </button>
+          </div>
+
           <form onSubmit={manejarLoginPrincipal} className="space-y-4">
-            <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 transition-all" placeholder="Usuario" />
+            <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 transition-all" placeholder={tipoAcceso === 'staff' ? "Usuario" : "Correo electrónico"} />
             <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-slate-900 outline-none focus:ring-2 focus:ring-violet-500 transition-all" placeholder="••••••••" />
-            <button type="submit" className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl uppercase tracking-tighter shadow-lg transition-all active:scale-95">Entrar</button>
+            <button type="submit" className="w-full bg-violet-600 hover:bg-violet-700 text-white font-black py-4 rounded-2xl uppercase tracking-tighter shadow-lg transition-all active:scale-95">
+              Entrar al Panel
+            </button>
           </form>
         </div>
       </div>
     );
   }
 
+  // 2. SI ES PAPÁ: MOSTRAR DASHBOARD PERSONAL
+  if (userRole === 'papa') {
+    return <DashboardPadre padreId={userId} alCerrarSesion={cerrarSesion} />;
+  }
+
+  // 3. SI ES STAFF/ADMIN: MOSTRAR KIOSCO COMPLETO
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 lg:p-8">
       <header className="flex flex-col items-center mb-8 border-b border-slate-200 pb-6 gap-6 w-full">
@@ -280,9 +323,6 @@ function App() {
                     <ArrowRightCircle size={20} className="text-slate-300 group-hover:text-violet-600" />
                   </button>
                 ))}
-                {tutoresEncontrados.length === 0 && (
-                  <p className="text-center py-10 text-slate-400 font-bold uppercase text-xs">No se encontraron resultados</p>
-                )}
               </div>
             </div>
           </div>
@@ -298,7 +338,7 @@ function App() {
                  </div>
                )}
                
-               <div className="relative rounded-[3.5rem] overflow-hidden border-8 border-white bg-slate-200 shadow-2xl aspect-[3/4] mx-auto w-full group">
+               <div className="relative rounded-[3.5rem] overflow-hidden border-8 border-white bg-slate-200 shadow-2xl aspect-[3/4] mx-auto w-full">
                   <Webcam 
                     audio={false} 
                     ref={webcamRef} 
@@ -307,16 +347,6 @@ function App() {
                     className="absolute inset-0 w-full h-full object-cover" 
                     mirrored={true} 
                   />
-                  
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-3/4 h-3/4 border-2 border-white/20 rounded-[3rem] relative">
-                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-violet-500 rounded-tl-2xl" />
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-violet-500 rounded-tr-2xl" />
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-violet-500 rounded-bl-2xl" />
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-violet-500 rounded-br-2xl" />
-                    </div>
-                  </div>
-
                   {loading && (
                     <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-20">
                       <RefreshCw className="animate-spin text-violet-600" size={54} />
@@ -350,7 +380,6 @@ function App() {
 
                         {resultado.data.hijos?.length > 0 ? (
                           <div className="space-y-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Niños:</p>
                             {resultado.data.hijos.map((h, i) => {
                               const hID = h.id || h.hijo_id;
                               const estaSeleccionado = seleccionados.includes(hID);
@@ -359,70 +388,61 @@ function App() {
                               const estaDentro = estado === "ENTRADA";
 
                               return (
-                                <div key={i} className={`p-4 rounded-2xl border transition-all ${yaSalio ? 'bg-slate-100 opacity-60' : estaSeleccionado ? 'bg-violet-50 border-violet-200 shadow-sm' : 'bg-white'}`}>
+                                <div key={i} className={`p-4 rounded-2xl border transition-all ${yaSalio ? 'opacity-50 bg-slate-100' : estaSeleccionado ? 'bg-violet-50 border-violet-200 shadow-sm' : 'bg-white'}`}>
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <input type="checkbox" disabled={yaSalio} checked={estaSeleccionado} onChange={() => manejarToggleHijo(h)} className={`w-6 h-6 rounded-lg ${yaSalio ? 'cursor-not-allowed' : 'accent-violet-600 cursor-pointer'}`} />
-                                        <div className="flex flex-col">
-                                            <span className={`font-bold uppercase text-sm ${yaSalio ? 'line-through text-slate-400' : 'text-slate-700'}`}>{h.nombre_niño || h.nombre}</span>
-                                            {yaSalio && <span className="text-[8px] font-bold text-rose-500 uppercase">Salida ya registrada</span>}
-                                        </div>
+                                        <input type="checkbox" disabled={yaSalio} checked={estaSeleccionado} onChange={() => manejarToggleHijo(h)} className="w-6 h-6 rounded-lg accent-violet-600" />
+                                        <span className={`font-bold uppercase text-sm ${yaSalio ? 'line-through' : 'text-slate-700'}`}>{h.nombre_niño || h.nombre}</span>
                                     </div>
-                                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${estaDentro ? 'bg-emerald-100 text-emerald-700' : yaSalio ? 'bg-slate-200 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>
-                                        {estado === "AUSENTE" || estado === "FUERA" ? "AUSENTE" : estado}
+                                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${estaDentro ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                                        {estado}
                                     </span>
                                   </div>
 
                                   {estaSeleccionado && !estaDentro && !yaSalio && (
                                     <div className="mt-4 space-y-3 pt-4 border-t border-violet-100">
                                         <div className="grid grid-cols-2 gap-2">
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-colors ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                                {formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Viene Aseado?'}
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400'}`}>
+                                                {formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Aseado?'}
                                             </button>
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-colors ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white border-rose-600' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                                {formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Trae Golpes?'}
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white' : 'bg-white text-slate-400'}`}>
+                                                {formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Golpes?'}
                                             </button>
                                         </div>
-                                        <input type="text" placeholder="Observaciones de entrada..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs outline-none focus:ring-1 focus:ring-violet-300" onChange={(e) => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], observaciones: e.target.value}})} />
+                                        <input type="text" placeholder="Observaciones..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs outline-none" onChange={(e) => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], observaciones: e.target.value}})} />
                                     </div>
                                   )}
-
                                   {estaSeleccionado && estaDentro && (
-                                    <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <LogOutIcon size={14} className="text-blue-600" />
-                                            <span className="text-[10px] font-bold text-blue-700 uppercase">Listo para registrar SALIDA</span>
-                                        </div>
-                                        <Clock size={14} className="text-blue-300" />
+                                    <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-2">
+                                        <LogOutIcon size={14} className="text-blue-600" />
+                                        <span className="text-[10px] font-bold text-blue-700 uppercase">Listo para SALIDA</span>
                                     </div>
                                   )}
                                 </div>
                               );
                             })}
-                            <button onClick={registrarMultiplesAsistencias} disabled={seleccionados.length === 0 || loading} className={`w-full py-5 rounded-2xl font-black uppercase text-sm shadow-lg flex items-center justify-center gap-3 transition-all ${seleccionados.length > 0 ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                                {loading ? <RefreshCw className="animate-spin" /> : <Send size={18} />}
-                                Confirmar {seleccionados.length} Movimiento(s)
+                            <button onClick={registrarMultiplesAsistencias} disabled={seleccionados.length === 0} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm shadow-lg flex items-center justify-center gap-3 disabled:opacity-50">
+                                <Send size={18} /> Confirmar {seleccionados.length} Movimiento(s)
                             </button>
                           </div>
                         ) : (
                           <div className="text-center p-6 bg-amber-50 rounded-2xl border border-amber-100">
                              <Baby size={32} className="mx-auto text-amber-400 mb-2" />
-                             <p className="text-sm font-bold text-amber-800 uppercase">Sin niños asignados</p>
-                             <p className="text-[10px] text-amber-600 uppercase mt-1">Contacte al administrador para vincular hijos.</p>
+                             <p className="text-sm font-bold text-amber-800">Sin niños asignados</p>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <p className="text-rose-600 font-bold bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">{resultado.msg}</p>
-                        <button onClick={() => setResultado(null)} className="w-full py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-slate-600">Reintentar</button>
+                        <p className="text-rose-600 font-bold bg-rose-50 p-4 rounded-xl text-center">{resultado.msg}</p>
+                        <button onClick={() => setResultado(null)} className="w-full py-3 text-slate-400 font-bold uppercase text-[10px]">Reintentar</button>
                       </div>
                     )}
                  </div>
                ) : (
                  <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-slate-300 rounded-[3rem] text-slate-400 bg-white">
                     <ScanEye size={48} className="mb-4 opacity-20" />
-                    <p className="font-bold uppercase text-[10px] tracking-widest leading-relaxed">Esperando detección de rostro...</p>
+                    <p className="font-bold uppercase text-[10px] tracking-widest">Esperando detección...</p>
                  </div>
                )}
             </div>
@@ -430,7 +450,7 @@ function App() {
         )}
       </main>
 
-      {/* MODALES */}
+      {/* MODAL GESTIÓN DE HIJOS */}
       {mostrarModalGestion && padreSeleccionado && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden relative border-t-8 border-t-violet-600 max-h-[90vh] flex flex-col">
@@ -446,23 +466,24 @@ function App() {
         </div>
       )}
 
+      {/* MODAL PIN PROTECCIÓN */}
       {showAdminPinModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200">
+          <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center shadow-2xl">
             <KeyRound size={40} className="mx-auto mb-4 text-amber-500" />
-            <h2 className="text-xl font-black text-slate-900 uppercase mb-6 tracking-tight">Acceso Protegido</h2>
+            <h2 className="text-xl font-black text-slate-900 uppercase mb-6">Acceso Protegido</h2>
             <input 
               type="password" 
               value={adminPin} 
               onChange={(e) => setAdminPin(e.target.value)} 
               onKeyDown={(e) => e.key === 'Enter' && verificarPinAdmin()} 
-              className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none focus:ring-2 focus:ring-amber-500" 
+              className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none" 
               autoFocus 
               placeholder="****"
             />
             <div className="flex gap-2">
               <button onClick={() => setShowAdminPinModal(false)} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs">Cancelar</button>
-              <button onClick={verificarPinAdmin} className="flex-1 bg-amber-500 py-3 rounded-xl font-black text-white uppercase shadow-lg hover:bg-amber-600 transition-colors">Validar</button>
+              <button onClick={verificarPinAdmin} className="flex-1 bg-amber-500 py-3 rounded-xl font-black text-white uppercase">Validar</button>
             </div>
           </div>
         </div>
