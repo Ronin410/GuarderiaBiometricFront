@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import api from './axiosConfig'; 
+// Importar componentes de rutas
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { 
   UserPlus, ScanEye, Baby, AlertCircle, Users, Search, 
   ClipboardList, TrendingUp, ShieldCheck, ArrowRightCircle, 
@@ -12,7 +14,8 @@ import {
 import GestionHijos from './GestionHijos';
 import VistaBitacora from './VistaBitacora';
 import PanelReportes from './PanelReportes';
-import DashboardPadre from './DashboardPadre'; // <-- Asegúrate de crear este archivo
+import DashboardPadre from './DashboardPadre'; 
+import ReportePublico from './ReportePublico'; // <-- Tu nueva ruta pública
 
 const videoConstraints = {
   width: { ideal: 720 },
@@ -21,36 +24,33 @@ const videoConstraints = {
   aspectRatio: 0.75 
 };
 
-function App() {
+// --- TODO TU CÓDIGO ACTUAL SE MANTIENE AQUÍ DENTRO ---
+function MainApp() {
   // --- ESTADOS DE AUTENTICACIÓN Y SESIÓN ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
-  const [userId, setUserId] = useState(null); // ID específico del papá
+  const [userId, setUserId] = useState(null); 
   const [guarderiaInfo, setGuarderiaInfo] = useState({ nombre: '', slug: '' });
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [tipoAcceso, setTipoAcceso] = useState('staff'); // 'staff' o 'papa'
+  const [tipoAcceso, setTipoAcceso] = useState('staff'); 
   
-  // --- ESTADOS DE NAVEGACIÓN Y UI ---
   const [tab, setTab] = useState('identificar');
   const [loading, setLoading] = useState(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [tabPendiente, setTabPendiente] = useState(null);
 
-  // --- ESTADOS DE RECONOCIMIENTO FACIAL ---
   const webcamRef = useRef(null);
   const [nombre, setNombre] = useState(''); 
   const [resultado, setResultado] = useState(null);
   const [seleccionados, setSeleccionados] = useState([]);
   const [formAsistencia, setFormAsistencia] = useState({});
 
-  // --- ESTADOS DE GESTIÓN DE PADRES/HIJOS ---
   const [padreSeleccionado, setPadreSeleccionado] = useState(null);
   const [tutoresEncontrados, setTutoresEncontrados] = useState([]);
   const [mostrarModalGestion, setMostrarModalGestion] = useState(false);
 
-  // Persistencia de sesión
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -68,11 +68,9 @@ function App() {
     if (tab === 'admin' && isLoggedIn) cargarTodosLosPadres();
   }, [tab, isLoggedIn]);
 
-  // --- FUNCIONES DE ACCESO ---
   const manejarLoginPrincipal = async (e) => {
     if (e) e.preventDefault();
     try {
-      // Enviamos el tipo para que el backend busque en la tabla correcta
       const res = await api.post('/login', { 
         username: loginUsername, 
         password: loginPassword,
@@ -138,7 +136,6 @@ function App() {
     }
   };
 
-  // --- RECONOCIMIENTO Y ASISTENCIA (Lógica Original) ---
   const procesarRostro = async (endpoint) => {
     if (endpoint === 'registrar' && !nombre.trim()) {
       alert("⚠️ Error: No has escrito un nombre para el registro.");
@@ -227,9 +224,6 @@ function App() {
     } catch (err) { console.error(err); }
   };
 
-  // --- RENDERIZADO CONDICIONAL ---
-
-  // 1. SI NO ESTÁ LOGUEADO: MOSTRAR LOGIN CON SELECTOR DE ROL
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -267,12 +261,10 @@ function App() {
     );
   }
 
-  // 2. SI ES PAPÁ: MOSTRAR DASHBOARD PERSONAL
   if (userRole === 'papa') {
     return <DashboardPadre padreId={userId} alCerrarSesion={cerrarSesion} />;
   }
 
-  // 3. SI ES STAFF/ADMIN: MOSTRAR KIOSCO COMPLETO
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 lg:p-8">
       <header className="flex flex-col items-center mb-8 border-b border-slate-200 pb-6 gap-6 w-full">
@@ -299,7 +291,6 @@ function App() {
       <main className="max-w-5xl mx-auto">
         {tab === 'reportes' && <PanelReportes />}
         {tab === 'bitacora' && <VistaBitacora />}
-        
         {tab === 'admin' && (
           <div className="animate-in fade-in duration-500">
             <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl">
@@ -307,12 +298,7 @@ function App() {
                 <div className="bg-violet-100 p-3 rounded-2xl text-violet-600"><Search size={28} /></div>
                 <h3 className="text-xl font-black uppercase text-slate-900">Directorio de Tutores</h3>
               </div>
-              <input 
-                type="text" 
-                placeholder="Buscar por nombre..." 
-                className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-slate-900 mb-6 transition-all" 
-                onChange={(e) => cargarTodosLosPadres(e.target.value)} 
-              />
+              <input type="text" placeholder="Buscar por nombre..." className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-slate-900 mb-6 transition-all" onChange={(e) => cargarTodosLosPadres(e.target.value)} />
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 {tutoresEncontrados.map(tutor => (
                   <button key={tutor.id} onClick={() => { setPadreSeleccionado(tutor); setMostrarModalGestion(true); }} className="w-full bg-slate-50 border border-slate-100 hover:bg-violet-50 p-4 rounded-xl flex justify-between items-center group transition-all text-left">
@@ -337,32 +323,14 @@ function App() {
                    <input type="text" placeholder="Ej. Juan Pérez" value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none shadow-sm" />
                  </div>
                )}
-               
                <div className="relative rounded-[3.5rem] overflow-hidden border-8 border-white bg-slate-200 shadow-2xl aspect-[3/4] mx-auto w-full">
-                  <Webcam 
-                    audio={false} 
-                    ref={webcamRef} 
-                    screenshotFormat="image/jpeg" 
-                    videoConstraints={videoConstraints}
-                    className="absolute inset-0 w-full h-full object-cover" 
-                    mirrored={true} 
-                  />
-                  {loading && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-20">
-                      <RefreshCw className="animate-spin text-violet-600" size={54} />
-                    </div>
-                  )}
+                  <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" videoConstraints={videoConstraints} className="absolute inset-0 w-full h-full object-cover" mirrored={true} />
+                  {loading && <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-20"><RefreshCw className="animate-spin text-violet-600" size={54} /></div>}
                </div>
-
-               <button 
-                 onClick={() => procesarRostro(tab)} 
-                 disabled={loading} 
-                 className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white rounded-[2rem] font-black uppercase text-xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
-               >
+               <button onClick={() => procesarRostro(tab)} disabled={loading} className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white rounded-[2rem] font-black uppercase text-xl shadow-lg active:scale-95 transition-all disabled:opacity-50">
                  {loading ? 'Procesando...' : (tab === 'registrar' ? 'Confirmar Registro' : 'Escanear Rostro')}
                </button>
             </div>
-
             <div className="w-full max-w-md">
                {resultado ? (
                  <div className={`p-6 sm:p-8 rounded-[3rem] border-2 bg-white shadow-xl animate-in zoom-in duration-300 ${resultado.type === 'success' ? 'border-emerald-100' : 'border-rose-100'}`}>
@@ -370,14 +338,12 @@ function App() {
                       {resultado.type === 'success' ? <CheckCircle className="text-emerald-500" size={28} /> : <AlertCircle className="text-rose-500" size={28} />}
                       <h3 className="text-xl font-black uppercase text-slate-900">{resultado.type === 'success' ? 'Identificado' : 'Aviso'}</h3>
                     </div>
-                    
                     {resultado.type === 'success' ? (
                       <div className="space-y-6">
                         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                           <p className="text-violet-600 text-[10px] font-black uppercase mb-1 tracking-widest">Tutor</p>
                           <p className="text-xl font-bold text-slate-900 uppercase">{resultado.data.nombre}</p>
                         </div>
-
                         {resultado.data.hijos?.length > 0 ? (
                           <div className="space-y-4">
                             {resultado.data.hijos.map((h, i) => {
@@ -386,7 +352,6 @@ function App() {
                               const estado = h.ultimo_estado || "AUSENTE";
                               const yaSalio = estado === "SALIDA";
                               const estaDentro = estado === "ENTRADA";
-
                               return (
                                 <div key={i} className={`p-4 rounded-2xl border transition-all ${yaSalio ? 'opacity-50 bg-slate-100' : estaSeleccionado ? 'bg-violet-50 border-violet-200 shadow-sm' : 'bg-white'}`}>
                                   <div className="flex items-center justify-between">
@@ -394,20 +359,13 @@ function App() {
                                         <input type="checkbox" disabled={yaSalio} checked={estaSeleccionado} onChange={() => manejarToggleHijo(h)} className="w-6 h-6 rounded-lg accent-violet-600" />
                                         <span className={`font-bold uppercase text-sm ${yaSalio ? 'line-through' : 'text-slate-700'}`}>{h.nombre_niño || h.nombre}</span>
                                     </div>
-                                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${estaDentro ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
-                                        {estado}
-                                    </span>
+                                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${estaDentro ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>{estado}</span>
                                   </div>
-
                                   {estaSeleccionado && !estaDentro && !yaSalio && (
                                     <div className="mt-4 space-y-3 pt-4 border-t border-violet-100">
                                         <div className="grid grid-cols-2 gap-2">
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400'}`}>
-                                                {formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Aseado?'}
-                                            </button>
-                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white' : 'bg-white text-slate-400'}`}>
-                                                {formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Golpes?'}
-                                            </button>
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], aseado: !formAsistencia[hID]?.aseado}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.aseado ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400'}`}>{formAsistencia[hID]?.aseado ? 'Aseado ✓' : '¿Aseado?'}</button>
+                                            <button onClick={() => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], golpes: !formAsistencia[hID]?.golpes}})} className={`py-3 rounded-xl text-[10px] font-black uppercase border ${formAsistencia[hID]?.golpes ? 'bg-rose-500 text-white' : 'bg-white text-slate-400'}`}>{formAsistencia[hID]?.golpes ? 'Golpes !' : '¿Golpes?'}</button>
                                         </div>
                                         <input type="text" placeholder="Observaciones..." className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs outline-none" onChange={(e) => setFormAsistencia({...formAsistencia, [hID]: {...formAsistencia[hID], observaciones: e.target.value}})} />
                                     </div>
@@ -421,14 +379,11 @@ function App() {
                                 </div>
                               );
                             })}
-                            <button onClick={registrarMultiplesAsistencias} disabled={seleccionados.length === 0} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm shadow-lg flex items-center justify-center gap-3 disabled:opacity-50">
-                                <Send size={18} /> Confirmar {seleccionados.length} Movimiento(s)
-                            </button>
+                            <button onClick={registrarMultiplesAsistencias} disabled={seleccionados.length === 0} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"><Send size={18} /> Confirmar {seleccionados.length} Movimiento(s)</button>
                           </div>
                         ) : (
                           <div className="text-center p-6 bg-amber-50 rounded-2xl border border-amber-100">
-                             <Baby size={32} className="mx-auto text-amber-400 mb-2" />
-                             <p className="text-sm font-bold text-amber-800">Sin niños asignados</p>
+                             <Baby size={32} className="mx-auto text-amber-400 mb-2" /><p className="text-sm font-bold text-amber-800">Sin niños asignados</p>
                           </div>
                         )}
                       </div>
@@ -441,8 +396,7 @@ function App() {
                  </div>
                ) : (
                  <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-slate-300 rounded-[3rem] text-slate-400 bg-white">
-                    <ScanEye size={48} className="mb-4 opacity-20" />
-                    <p className="font-bold uppercase text-[10px] tracking-widest">Esperando detección...</p>
+                    <ScanEye size={48} className="mb-4 opacity-20" /><p className="font-bold uppercase text-[10px] tracking-widest">Esperando detección...</p>
                  </div>
                )}
             </div>
@@ -450,37 +404,23 @@ function App() {
         )}
       </main>
 
-      {/* MODAL GESTIÓN DE HIJOS */}
       {mostrarModalGestion && padreSeleccionado && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden relative border-t-8 border-t-violet-600 max-h-[90vh] flex flex-col">
             <button onClick={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 z-10 p-2"><X size={32} /></button>
             <div className="overflow-y-auto flex-1">
-              <GestionHijos 
-                padreId={padreSeleccionado.id} 
-                nombrePadre={padreSeleccionado.nombre} 
-                onFinalizar={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} 
-              />
+              <GestionHijos padreId={padreSeleccionado.id} nombrePadre={padreSeleccionado.nombre} onFinalizar={() => { setMostrarModalGestion(false); cargarTodosLosPadres(); }} />
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL PIN PROTECCIÓN */}
       {showAdminPinModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm text-center shadow-2xl">
             <KeyRound size={40} className="mx-auto mb-4 text-amber-500" />
             <h2 className="text-xl font-black text-slate-900 uppercase mb-6">Acceso Protegido</h2>
-            <input 
-              type="password" 
-              value={adminPin} 
-              onChange={(e) => setAdminPin(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && verificarPinAdmin()} 
-              className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none" 
-              autoFocus 
-              placeholder="****"
-            />
+            <input type="password" value={adminPin} onChange={(e) => setAdminPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && verificarPinAdmin()} className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-3xl mb-6 outline-none" autoFocus placeholder="****" />
             <div className="flex gap-2">
               <button onClick={() => setShowAdminPinModal(false)} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs">Cancelar</button>
               <button onClick={verificarPinAdmin} className="flex-1 bg-amber-500 py-3 rounded-xl font-black text-white uppercase">Validar</button>
@@ -489,6 +429,24 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+// --- ESTO ES LO ÚNICO NUEVO: EL ENRUTADOR ---
+function App() {
+  return (
+    <Router>
+      <Routes>
+        {/* Ruta para el reporte del padre (pública) */}
+        <Route path="/seguimiento/:token" element={<ReportePublico />} />
+
+        {/* Todas las demás rutas cargan tu app administrativa original */}
+        <Route path="/*" element={<MainApp />} />
+
+        {/* Redirección por defecto si algo sale mal */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }
 

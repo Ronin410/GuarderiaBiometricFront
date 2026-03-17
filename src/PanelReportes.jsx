@@ -2,14 +2,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from './axiosConfig'; 
 import { 
   Download, Clock, User, CheckCircle, ShieldAlert, 
-  ShieldCheck, ChevronUp, ChevronDown, ArrowUpDown
+  ShieldCheck, ChevronUp, ChevronDown, ArrowUpDown, Moon
 } from 'lucide-react';
 
 const PanelReportes = () => {
   const [reportes, setReportes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]);
+
+  // CORRECCIÓN DE FECHA: Usamos toLocaleDateString para evitar desfases de horario UTC
+  const hoyLocal = new Date().toLocaleDateString('en-CA'); 
+
+  const [fechaInicio, setFechaInicio] = useState(hoyLocal);
+  const [fechaFin, setFechaFin] = useState(hoyLocal);
   const [busquedaNombre, setBusquedaNombre] = useState(""); 
   const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
 
@@ -21,13 +25,15 @@ const PanelReportes = () => {
       });
       setReportes(Array.isArray(res.data) ? res.data : []);
     } catch (error) { 
-      console.error(error); 
+      console.error("Error al obtener reportes:", error); 
     } finally { 
       setLoading(false); 
     }
   };
 
-  useEffect(() => { obtenerReportes(); }, [fechaInicio, fechaFin]);
+  useEffect(() => { 
+    obtenerReportes(); 
+  }, [fechaInicio, fechaFin]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -60,12 +66,7 @@ const PanelReportes = () => {
           @page { size: landscape; margin: 0.8cm; }
           body { background: white !important; }
           .no-print { display: none !important; }
-          .print-container { 
-            width: 100% !important; 
-            max-width: 100% !important; 
-            margin: 0 auto !important; 
-            padding: 0 !important;
-          }
+          .print-container { width: 100% !important; max-width: 100% !important; margin: 0 auto !important; padding: 0 !important; }
           .table-wrapper { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
           table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; }
           .break-inside-avoid { page-break-inside: avoid; }
@@ -177,12 +178,19 @@ const PanelReportes = () => {
                     <td className="p-4 align-top">
                       {esSalida ? (
                         <div className="space-y-3">
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3"> {/* Ajustado a 5 columnas */}
                             {[
                               { label: 'DESAYUNO', val: b.desayuno, col: 'text-blue-600', bg: 'bg-blue-50/40' },
                               { label: 'COMIDA', val: b.comida, col: 'text-orange-600', bg: 'bg-orange-50/40' },
                               { label: 'MERIENDA', val: b.merienda, col: 'text-pink-600', bg: 'bg-pink-50/40' },
-                              { label: 'ESFÍNTER', val: b.esfinter, col: 'text-emerald-600', bg: 'bg-emerald-50/40' }
+                              { label: 'ESFÍNTER', val: b.esfinter, col: 'text-emerald-600', bg: 'bg-emerald-50/40' },
+                              // NUEVA TARJETA: ESTADO DE SUEÑO
+                              { 
+                                label: 'DORMIÓ', 
+                                val: b.durmio ? 'SÍ' : 'NO', 
+                                col: b.durmio ? 'text-indigo-600' : 'text-slate-400', 
+                                bg: b.durmio ? 'bg-indigo-50/40' : 'bg-slate-50/40' 
+                              }
                             ].map(item => (
                               <div key={item.label} className={`${item.bg} p-2.5 rounded-xl border border-slate-100`}>
                                 <span className={`text-[8px] font-black ${item.col} block mb-1 tracking-wider`}>{item.label}</span>
@@ -215,22 +223,17 @@ const PanelReportes = () => {
           </table>
         </div>
 
-        {/* SECCIÓN DE FIRMA ÚNICA (Sólo Impresión) */}
+        {/* SECCIÓN DE FIRMA */}
         <div className="hidden print:flex flex-col items-center mt-16 space-y-4">
           <div className="flex items-center justify-center gap-20">
-            {/* Espacio para Sello */}
             <div className="w-[100px] h-[100px] border border-dashed border-slate-200 rounded-full flex items-center justify-center">
               <span className="text-[7px] font-black text-slate-200 uppercase">Sello</span>
             </div>
-            
-            {/* Línea de Firma */}
             <div className="flex flex-col items-center">
               <div className="w-[300px] border-t-2 border-slate-900 mb-2"></div>
               <p className="text-[11px] font-black text-slate-900 uppercase tracking-tighter">Firma de la Dirección</p>
               <p className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em]">Responsable de Institución</p>
             </div>
-            
-            {/* Espacio vacío para balancear el sello */}
             <div className="w-[100px]"></div>
           </div>
         </div>
